@@ -24,7 +24,7 @@ target_lan = 240
                                                       target_apoapsis,
                                                       target_inclination,
                                                       target_lan,
-                                                      -1.5)
+                                                      -0.5)
 
 game_launch_time = space_center.ut + launch_time
 space_center.warp_to(game_launch_time - 10)
