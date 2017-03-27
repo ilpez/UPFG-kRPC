@@ -1,5 +1,6 @@
 import Global
 import numpy as np
+import sys
 import time
 import upfg
 # from multiprocessing.pool import ThreadPool
@@ -15,16 +16,28 @@ surface_speed = Global.surface_speed
 g0 = Global.g0
 mu = Global.mu
 
-target_apoapsis = 200
-target_periapsis = 200
-target_inclination = 51.65
-target_lan = 240
-
+target_apoapsis = float(sys.argv[1])
+target_periapsis = float(sys.argv[2])
+target_inclination = float(sys.argv[3])
+target_lan = float(sys.argv[4])
+if sys.argv[5] == 'RTLS':
+    meco_speed = 1700
+    turn_speed = 50
+elif sys.argv[5] == 'ASDS':
+    meco_speed = 2300
+    turn_speed = 30
+elif sys.argv[5] == 'EXP':
+    meco_speed = 2700
+    turn_speed = 30
+else:
+    meco_speed = 3000
+    turn_speed = 30
+print(meco_speed)
 [azimuth, launch_time, target] = upfg.launchTargeting(target_periapsis,
                                                       target_apoapsis,
                                                       target_inclination,
                                                       target_lan,
-                                                      -0.5)
+                                                      -1.0)
 
 game_launch_time = space_center.ut + launch_time
 space_center.warp_to(game_launch_time - 10)
@@ -53,7 +66,7 @@ vessel.control.activate_next_stage()
 
 print('Proceeding Launch..')
 
-while surface_speed() < 30:
+while surface_speed() < turn_speed:
     time.sleep(0.1)
 
 print('Clear from launch tower..')
@@ -67,9 +80,9 @@ while True:
         vessel.auto_pilot.target_roll -= 0.1
     else:
         vessel.auto_pilot.target_roll = 0
-    pitch = upfg.atand(1000 / surface_speed())
+    pitch = upfg.atand((900 - turn_speed) / (surface_speed() - turn_speed))
     vessel.auto_pilot.target_pitch = pitch
-    if surface_speed() > 2300 or vessel.available_thrust == 0:
+    if surface_speed() > meco_speed or vessel.available_thrust == 0:
         vessel.control.throttle = 0
         time.sleep(2)
         break
@@ -140,3 +153,11 @@ while True:
     if upfg_guided.tgo < 0.1:
         vessel.control.throttle = 0
         break
+    if Global.surface_altitude() > 100000 and not fairing_jettison:
+        for part in vessel.parts.all:
+            for module in part.modules:
+                if module.has_event('Jettison'):
+                    module.trigger_event('Jettison')
+                    fairing_jettison = True
+
+print('Mission Success')
