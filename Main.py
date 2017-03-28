@@ -73,7 +73,7 @@ print('Begin Pitch and Roll Program..')
 
 vessel.auto_pilot.target_heading = azimuth
 vessel.auto_pilot.target_roll = azimuth
-
+vessel.auto_pilot.attenuation_angle = (1, 1, 0.2)
 while True:
     if vessel.auto_pilot.target_roll > 0:
         vessel.auto_pilot.target_roll -= 0.1
