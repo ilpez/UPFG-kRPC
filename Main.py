@@ -59,7 +59,6 @@ while vessel.thrust < vessel.available_thrust:
     time.sleep(0.01)
 
 vessel.auto_pilot.engage()
-vessel.auto_pilot.attenuation_angle = (1, 1, 0.4)
 vessel.auto_pilot.target_heading = 0
 vessel.auto_pilot.target_pitch = 90
 vessel.control.activate_next_stage()
@@ -74,7 +73,7 @@ print('Begin Pitch and Roll Program..')
 
 vessel.auto_pilot.target_heading = azimuth
 vessel.auto_pilot.target_roll = azimuth
-
+vessel.auto_pilot.attenuation_angle = (1, 1, 0.2)
 while True:
     if vessel.auto_pilot.target_roll > 0:
         vessel.auto_pilot.target_roll -= 0.1
