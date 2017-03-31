@@ -16,6 +16,9 @@ surface_speed = Global.surface_speed
 g0 = Global.g0
 mu = Global.mu
 
+g_lim = 4
+q_lim = 27000
+
 target_apoapsis = float(sys.argv[1])
 target_periapsis = float(sys.argv[2])
 target_inclination = float(sys.argv[3])
@@ -46,7 +49,7 @@ while (space_center.ut - game_launch_time) < 0:
     print('Time to launch %f' % (space_center.ut - game_launch_time))
     time.sleep(1)
 
-vessel.control.throttle = 1
+vessel.control.throttle = upfg.throttle_control(g_lim, q_lim)
 for engine in vessel.parts.engines:
     if not engine.active:
         print('There is no active engine, checking Propellant condition')
@@ -75,12 +78,16 @@ vessel.auto_pilot.target_heading = azimuth
 vessel.auto_pilot.target_roll = azimuth
 vessel.auto_pilot.attenuation_angle = (1, 1, 0.2)
 while True:
+    vessel.control.throttle = upfg.throttle_control(g_lim, q_lim)
     if vessel.auto_pilot.target_roll > 0:
         vessel.auto_pilot.target_roll -= 0.1
     else:
         vessel.auto_pilot.target_roll = 0
-    pitch = upfg.atand((900 - turn_speed) / (surface_speed() - turn_speed))
-    vessel.auto_pilot.target_pitch = pitch
+    pitch1 = upfg.atand((900 - turn_speed) / (surface_speed() - turn_speed))
+    pitch2 = upfg.angle_from_vec(Global.surface_velocity(),
+                                 Global.body_reference_frame,
+                                 'pitch')
+    vessel.auto_pilot.target_pitch = min(pitch1, pitch2)
     if surface_speed() > meco_speed or vessel.available_thrust == 0:
         vessel.control.throttle = 0
         time.sleep(2)
@@ -102,7 +109,8 @@ for engine in vessel.parts.engines:
                 if engine.get_field('Propellant') == 'Very Stable':
                     print('Engine is ready')
                     vessel.control.forward = 0
-                    vessel.control.throttle = 1
+                    vessel.control.throttle = upfg.throttle_control(
+                        g_lim, q_lim)
                     vessel.control.activate_next_stage()
 
 while vessel.thrust < vessel.available_thrust:
@@ -128,31 +136,41 @@ upfg_internal.rbias = [0, 0, 0]
 upfg_internal.rd = rdinit
 upfg_internal.rgrav = np.multiply(
     np.multiply(-(mu / 2), position()), 1 / upfg.norm(position())**3)
-upfg_internal.tb = 0
+upfg_internal.tb = 200
 upfg_internal.time = time.time()
 upfg_internal.tgo = 0
 upfg_internal.v = velocity()
 upfg_internal.vgo = vdinit
-
+converged = False
 upfg_guided = upfg.struct()
+iteration = 0
 
-[upfg_internal, upfg_guided] = upfg.upfg(
-    time.time(), position(), velocity(), target, upfg_internal)
+while converged is False:
+    [upfg_internal, upfg_guided] = upfg.upfg(target, upfg_internal)
+    t1 = upfg_internal.tgo
+    [upfg_internal, upfg_guided] = upfg.upfg(target, upfg_internal)
+    t2 = upfg_internal.tgo
+    if abs(t1 - t2) / t2 < 0.01:
+        print('Guidance converged after %f iteration'
+              % iteration)
+        converged = True
+    iteration += 1
+
 
 while True:
-    [upfg_internal, upfg_guided] = upfg.upfg(
-        time.time(), position(), velocity(), target, upfg_internal)
+    vessel.control.throttle = upfg.throttle_control(g_lim, q_lim)
+    [upfg_internal, upfg_guided] = upfg.upfg(target, upfg_internal)
     t = upfg_internal.tgo
-    [upfg_internal, upfg_guided] = upfg.upfg(
-        time.time(), position(), velocity(), target, upfg_internal)
-    t1 = upfg_internal.tgo
-    if abs(t1 - t) / t1 < 0.01 and t1 > 1:
+    if t > 1:
         vessel.auto_pilot.target_heading = upfg_guided.yaw
         vessel.auto_pilot.target_pitch = upfg_guided.pitch
     if upfg_guided.tgo < 0.1:
         vessel.control.throttle = 0
         break
-    if Global.surface_altitude() > 100000 and not fairing_jettison:
+    if Global.orbital_speed() > target.velocity:
+        vessel.control.throttle = 0
+        break
+    if Global.surface_altitude() > 110000 and not fairing_jettison:
         for part in vessel.parts.all:
             for module in part.modules:
                 if module.has_event('Jettison'):

@@ -161,16 +161,16 @@ def angle_from_vec(x, ref, angle):
     return out
 
 
-def upfg(time, position, velocity, target, previous):
+def upfg(target, previous):
     # gamma = target.angle
     iy = np.asarray(target.normal)
     rdval = target.radius
     vdval = target.velocity
-    t = time
-    m = vessel.mass
-    r = position
+    t = Global.universal_time()
+    m = Global.state_mass()
+    r = Global.orbital_position()
     r = np.array([r[0], r[2], r[1]])
-    v = velocity
+    v = Global.orbital_velocity()
     v = np.array([v[0], v[2], v[1]])
     cser = previous.cser
     rbias = np.asarray(previous.rbias)
@@ -182,11 +182,11 @@ def upfg(time, position, velocity, target, previous):
 
     # SM = 1
     # aL = 0
-    fT = vessel.thrust
+    fT = Global.state_thrust()
     ve = vessel.specific_impulse * g0
     aT = fT / m
     tu = ve / aT
-    tb = 200
+    tb = previous.tb
 
     dt = t - tp
     dvsensed = v - vprev
@@ -195,7 +195,8 @@ def upfg(time, position, velocity, target, previous):
     tb = tb - previous.tb
 
     l1 = norm(vgo)
-    tgo = tu * (1 - np.exp(-l1 / ve))
+    tb = tu * (1 - np.exp(-l1 / ve))
+    tgo = tb
     if tgo > 5:
         theta_max = d2r(60)
     else:
@@ -502,3 +503,18 @@ def rodrigues(vector, axis, angle):
     rotated += axis * dot(axis, vector) * (1 - cosd(angle))
 
     return rotated
+
+
+def throttle_control(G_limit, Q_limit):
+    min_thrust = vessel.max_thrust * (360 / 934)
+    max_thrust = vessel.max_thrust
+    if max_thrust == 0:
+        return 1
+    G_thrust = G_limit * Global.state_mass() * g0
+    G_throttle = (G_thrust - min_thrust) / (max_thrust - min_thrust)
+
+    Q_ratio = Global.state_q() / Q_limit
+    Q_throttle = 1 - 15 * (Q_ratio - 1)
+    the_throttle = np.clip(min(Q_throttle, G_throttle), 0.01, 1)
+
+    return the_throttle
