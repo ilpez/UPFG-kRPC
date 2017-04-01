@@ -103,13 +103,16 @@ def launchTargeting(periapsis,
     velocity = np.sqrt((velocity_periapsis**2) + 2 * mu *
                        ((1 / radius) - (1 / periapsis)))
     angle = 90 - asind((periapsis * velocity_periapsis) / (radius * velocity))
-
-    if np.absolute(inclination) < vessel.flight().latitude:
+    descending = False
+    if inclination < 0:
+        descending = True
+        inclination = abs(inclination)
+    if inclination < vessel.flight().latitude:
         azimuth = 90
     else:
         beta_inertial = asind(cosd(inclination) /
                               cosd(vessel.flight().latitude))
-        if inclination < 0:
+        if descending:
             if beta_inertial <= 90:
                 beta_inertial = 180 - beta_inertial
             elif beta_inertial >= 270:
@@ -124,8 +127,8 @@ def launchTargeting(periapsis,
 
     relative_longitude = asind(tand(vessel.flight().latitude) /
                                tand(inclination))
-    if inclination < 0:
-        relative_longitude = 180 + relative_longitude
+    if descending:
+        relative_longitude = 180 - relative_longitude
     # earth_meridian = vessel.orbit.body.msl_position(0, 0, surfref)
     prime_meridian = vessel.orbit.body.msl_position(0, 0, orbref)
     rotational_angle = atan2d(dot(local_z, prime_meridian),
@@ -140,8 +143,8 @@ def launchTargeting(periapsis,
     launch_time = (node_angle / 360) * vessel.orbit.body.rotational_period
 
     Rx = np.array([[1, 0, 0],
-                   [0, cosd(abs(inclination)), -sind(abs(inclination))],
-                   [0, sind(abs(inclination)), cosd(abs(inclination))]])
+                   [0, cosd(inclination), -sind(inclination)],
+                   [0, sind(inclination), cosd(inclination)]])
     Rz = np.array([[cosd(lan), -sind(lan), 0],
                    [sind(lan), cosd(lan), 0],
                    [0, 0, 1]])
