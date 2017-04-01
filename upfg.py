@@ -84,7 +84,8 @@ def launchTargeting(periapsis,
                     apoapsis,
                     inclination,
                     lan,
-                    slip):
+                    true_anomaly=0,
+                    slip=-1.5):
     # surfref = vessel.orbit.body.reference_frame
     local_x = [1, 0, 0]
     # local_y = [0, 1, 0]
@@ -95,9 +96,13 @@ def launchTargeting(periapsis,
     periapsis += vessel.orbit.body.equatorial_radius
 
     semimajor_axis = (apoapsis + periapsis) / 2
-    # ecc = (apoapsis - periapsis)/(apoapsis + periapsis)
-    velocity = np.sqrt((mu * apoapsis) / (periapsis * semimajor_axis))
-    radius = periapsis
+    ecc = (apoapsis - periapsis) / (apoapsis + periapsis)
+    velocity_periapsis = np.sqrt(
+        (mu * apoapsis) / (periapsis * semimajor_axis))
+    radius = (semimajor_axis * (1 - ecc**2)) / (1 + ecc * cosd(true_anomaly))
+    velocity = np.sqrt((velocity_periapsis**2) + 2 * mu *
+                       ((1 / radius) - (1 / periapsis)))
+    angle = 90 - asind((periapsis * velocity_periapsis) / (radius * velocity))
 
     if np.absolute(inclination) < vessel.flight().latitude:
         azimuth = 90
@@ -134,13 +139,21 @@ def launchTargeting(periapsis,
     node_angle = np.mod(node_angle + 360 + slip, 360)
     launch_time = (node_angle / 360) * vessel.orbit.body.rotational_period
 
-    target_plane_normal = np.array([-sind(lan) * sind(inclination),
-                                    cosd(lan) * sind(inclination),
-                                    -cosd(inclination)])
+    Rx = np.array([[1, 0, 0],
+                   [0, cosd(abs(inclination)), -sind(abs(inclination))],
+                   [0, sind(abs(inclination)), cosd(abs(inclination))]])
+    Rz = np.array([[cosd(lan), -sind(lan), 0],
+                   [sind(lan), cosd(lan), 0],
+                   [0, 0, 1]])
+
+    m1 = np.matmul(Rz, Rx)
+    m2 = np.transpose([0, 0, -1])
+
+    target_plane_normal = np.matmul(m1, m2).transpose()
     target = struct()
     target.radius = radius
     target.normal = target_plane_normal
-    target.angle = 0
+    target.angle = angle
     target.velocity = velocity
 
     return (azimuth, launch_time, target)
@@ -162,7 +175,7 @@ def angle_from_vec(x, ref, angle):
 
 
 def upfg(target, previous):
-    # gamma = target.angle
+    gamma = target.angle
     iy = np.asarray(target.normal)
     rdval = target.radius
     vdval = target.velocity
@@ -253,7 +266,10 @@ def upfg(target, previous):
     rd = rdval * unit(rp)
     ix = unit(rd)
     iz = cross(ix, iy)
-    vd = vdval * iz
+    m1 = np.transpose([ix, iy, iz])
+    m2 = np.transpose([sind(gamma), 0, cosd(gamma)])
+    mx = np.matmul(m1, m2).transpose()
+    vd = vdval * mx
     vgo = vd - v - vgrav + vbias
 
     current = struct()
