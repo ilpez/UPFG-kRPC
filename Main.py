@@ -23,24 +23,25 @@ target_apoapsis = float(sys.argv[1])
 target_periapsis = float(sys.argv[2])
 target_inclination = float(sys.argv[3])
 target_lan = float(sys.argv[4])
-if sys.argv[5] == 'RTLS':
+target_true_anomaly = float(sys.argv[5])
+if sys.argv[6] == 'RTLS':
     meco_speed = 1700
-    turn_speed = 50
-elif sys.argv[5] == 'ASDS':
+    turn_speed = 55
+elif sys.argv[6] == 'ASDS':
     meco_speed = 2300
-    turn_speed = 30
-elif sys.argv[5] == 'EXP':
+    turn_speed = 50
+elif sys.argv[6] == 'EXP':
     meco_speed = 2700
-    turn_speed = 30
+    turn_speed = 50
 else:
     meco_speed = 3000
-    turn_speed = 30
+    turn_speed = 50
 print(meco_speed)
 [azimuth, launch_time, target] = upfg.launchTargeting(target_periapsis,
                                                       target_apoapsis,
                                                       target_inclination,
                                                       target_lan,
-                                                      -1.0)
+                                                      target_true_anomaly)
 
 game_launch_time = space_center.ut + launch_time
 space_center.warp_to(game_launch_time - 10)
