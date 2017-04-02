@@ -8,6 +8,7 @@ import upfg
 conn = Global.conn
 space_center = Global.space_center
 vessel = Global.vessel
+vehicle = upfg.analyze_vehicle()
 
 position = Global.orbital_position
 velocity = Global.orbital_velocity
@@ -137,8 +138,8 @@ upfg_internal.rbias = [0, 0, 0]
 upfg_internal.rd = rdinit
 upfg_internal.rgrav = np.multiply(
     np.multiply(-(mu / 2), position()), 1 / upfg.norm(position())**3)
-upfg_internal.tb = 200
-upfg_internal.time = time.time()
+upfg_internal.tb = 0
+upfg_internal.time = Global.universal_time()
 upfg_internal.tgo = 0
 upfg_internal.v = velocity()
 upfg_internal.vgo = vdinit
@@ -147,9 +148,9 @@ upfg_guided = upfg.struct()
 iteration = 0
 
 while converged is False:
-    [upfg_internal, upfg_guided] = upfg.upfg(target, upfg_internal)
+    [upfg_internal, upfg_guided] = upfg.upfg(vehicle, target, upfg_internal)
     t1 = upfg_internal.tgo
-    [upfg_internal, upfg_guided] = upfg.upfg(target, upfg_internal)
+    [upfg_internal, upfg_guided] = upfg.upfg(vehicle, target, upfg_internal)
     t2 = upfg_internal.tgo
     if abs(t1 - t2) / t2 < 0.01:
         print('Guidance converged after %f iteration'
@@ -160,7 +161,7 @@ while converged is False:
 
 while True:
     vessel.control.throttle = upfg.throttle_control(g_lim, q_lim)
-    [upfg_internal, upfg_guided] = upfg.upfg(target, upfg_internal)
+    [upfg_internal, upfg_guided] = upfg.upfg(vehicle, target, upfg_internal)
     t = upfg_internal.tgo
     if t > 1:
         vessel.auto_pilot.target_heading = upfg_guided.yaw

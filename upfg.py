@@ -177,7 +177,7 @@ def angle_from_vec(x, ref, angle):
     return out
 
 
-def upfg(target, previous):
+def upfg(vehicle, target, previous):
     gamma = target.angle
     iy = np.asarray(target.normal)
     rdval = target.radius
@@ -196,34 +196,89 @@ def upfg(target, previous):
     vprev = np.asarray(previous.v)
     vgo = np.asarray(previous.vgo)
 
-    # SM = 1
-    # aL = 0
-    fT = Global.state_thrust()
-    ve = vessel.specific_impulse * g0
-    aT = fT / m
-    tu = ve / aT
-    tb = previous.tb
+    n = len(vehicle)
+    md = list()
+    ve = list()
+    fT = list()
+    aT = list()
+    tu = list()
+    tb = list()
+
+    for i in range(n):
+        fT.append(vehicle[i].fT)
+        md.append(vehicle[i].md)
+        ve.append(vehicle[i].ve)
+        aT.append(fT[i] / vehicle[i].m0)
+        tu.append(ve[i] / aT[i])
+        tb.append(vehicle[i].maxT)
 
     dt = t - tp
     dvsensed = v - vprev
     vgo = vgo - dvsensed
     # vgo1 = vgo
-    tb = tb - previous.tb
+    tb[0] = tb[0] - previous.tb
 
-    l1 = norm(vgo)
-    tb = tu * (1 - np.exp(-l1 / ve))
-    tgo = tb
+    aT[0] = fT[0] / m
+    tu[0] = ve[0] / aT[0]
+    l_ = 0
+    li = list()
+
+    for i in range(n - 1):
+        li.append(ve[i] * np.log(tu[i] / (tu[i] - tb[i])))
+        l_ += li[i]
+        if l_ > norm(vgo):
+            vehicle.remove(vehicle[-1])
+            return(upfg(vehicle, target, previous))
+    li.append(norm(vgo) - l_)
+
+    tgoi = list()
+
+    for i in range(n):
+        tb[i] = tu[i] * (1 - np.exp(-li[i] / ve[i]))
+        if i == 0:
+            tgoi.append(tb[i])
+        else:
+            tgoi.append(tgoi[i - 1] + tb[i])
+
+    # l1 = li[0]
+    tgo = tgoi[n - 1]
     if tgo > 5:
         theta_max = d2r(60)
     else:
         theta_max = d2r(1)
 
-    l_ = l1
-    j = l_ * tu - ve * tgo
-    s = l_ * tgo - j
-    q = s * tu - (ve * tgo**2) / 2
-    p = q * tu - (ve * tgo**3) / 6
-    h = j * tgo - q
+    l_ = 0
+    s = 0
+    j = 0
+    q = 0
+    p = 0
+    h = 0
+    ji = list()
+    si = list()
+    qi = list()
+    pi = list()
+    tgoi1 = 0
+
+    for i in range(n):
+        if i > 0:
+            tgoi1 = tgoi[i - 1]
+        ji.append(tu[i] * li[i] - ve[i] * tb[i])
+        si.append(tb[i] * li[i] - ji[i])
+        qi.append(si[i] * (tu[i] + tgoi1) - 0.5 * ve[i] * tb[i]**2)
+        pi.append(qi[i] * (tu[i] + tgoi1) - 0.5 * ve[i]
+                  * tb[i]**2 * (tb[i] / 3 + tgoi1))
+
+        ji[i] += li[i] * tgoi1
+        si[i] += l_ * tb[i]
+        qi[i] += j * tb[i]
+        pi[i] += h * tb[i]
+
+        l_ += li[i]
+        j += ji[i]
+        s += si[i]
+        q += qi[i]
+        p += pi[i]
+        h = j * tgoi[i] - q
 
     lamb = unit(vgo)
     # rgrav1 = rgrav
@@ -280,7 +335,7 @@ def upfg(target, previous):
     current.rbias = rbias
     current.rd = rd
     current.rgrav = rgrav
-    current.tb = tb + dt
+    current.tb = previous.tb + dt
     current.time = t
     current.tgo = tgo
     current.v = v
@@ -525,8 +580,8 @@ def rodrigues(vector, axis, angle):
 
 
 def throttle_control(G_limit, Q_limit):
-    min_thrust = vessel.max_thrust * (360 / 934)
-    max_thrust = vessel.max_thrust
+    min_thrust = vessel.available_thrust * (360 / 934)
+    max_thrust = vessel.available_thrust
     if max_thrust == 0:
         return 1
     G_thrust = G_limit * Global.state_mass() * g0
@@ -537,3 +592,91 @@ def throttle_control(G_limit, Q_limit):
     the_throttle = np.clip(min(Q_throttle, G_throttle), 0.01, 1)
 
     return the_throttle
+
+
+def analyze_vehicle():
+    stage = list()
+    for part in vessel.parts.all:
+        if part.engine is not None:
+            stage.append(part.engine.part.decouple_stage)
+
+    print(stage)
+    m0 = list()
+    m1 = [0] * len(stage)
+    fT = list()
+    ve = list()
+    md = list()
+    aT = list()
+    tu = list()
+    l1 = list()
+    tb = list()
+    maxThrottle = list()
+    minThrottle = list()
+    for i in range(len(stage)):
+        stack = [vessel.parts.root]
+        mass = 0
+        dry_mass = 0
+        thrust = list()
+        isp = list()
+        fuel_name = list()
+        fuel_mass = 0
+        while len(stack) > 0:
+            part = stack.pop()
+            # print(part.title)
+            if part.engine is not None:
+                thrust.append(part.engine.max_vacuum_thrust)
+                isp.append(part.engine.vacuum_specific_impulse * g0)
+                fuel_name = part.engine.propellants
+                for fuel in fuel_name:
+                    parent = part.engine.part.parent
+                    fuel_mass += parent.resources.amount(fuel.name) * \
+                        parent.resources.density(fuel.name)
+                if i == len(stage) - 1:
+                    part.engine.thrust_limit = 0
+                    minThrottle.append(part.engine.available_thrust /
+                                       part.engine.max_thrust)
+                    part.engine.thrust_limit = 1
+                    maxThrottle.append(part.engine.available_thrust /
+                                       part.engine.max_thrust)
+            if part.decouple_stage <= stage[i]:
+                mass += part.mass
+                dry_mass += part.dry_mass
+                for child in part.children:
+                    stack.append(child)
+
+        m0.append(mass)
+        m1[i] = fuel_mass
+        for n in range(i):
+            m1[i] = m1[i] - m1[n]
+        fT.append(thrust[i])
+        ve.append(isp[i])
+        md.append(fT[i] / ve[i])
+        aT.append(fT[i] / m0[i] / g0)
+        tu.append(ve[i] / aT[i])
+        l1.append(ve[i] * np.log(m0[i] / (m0[i] - m1[i])))
+        tb.append(m1[i] / md[i])
+
+    m0.reverse()
+    m1.reverse()
+    fT.reverse()
+    ve.reverse()
+    md.reverse()
+    aT.reverse()
+    tu.reverse()
+    l1.reverse()
+    tb.reverse()
+    minThrottle.reverse()
+    maxThrottle.reverse()
+    stages = struct()
+    vehicle = list()
+    for i in range(len(stage)):
+        stages.m0 = m0[i]
+        stages.fT = fT[i]
+        stages.ve = ve[i]
+        stages.md = md[i]
+        stage.maxThrottle = maxThrottle[i]
+        stages.minThrottle = minThrottle[i]
+        stages.maxT = tb[i]
+        vehicle.append(stages)
+
+    return vehicle
