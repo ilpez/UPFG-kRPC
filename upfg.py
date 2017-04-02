@@ -615,7 +615,6 @@ def analyze_vehicle():
     for i in range(len(stage)):
         stack = [vessel.parts.root]
         mass = 0
-        dry_mass = 0
         thrust = list()
         isp = list()
         fuel_name = list()
@@ -640,7 +639,6 @@ def analyze_vehicle():
                                        part.engine.max_thrust)
             if part.decouple_stage <= stage[i]:
                 mass += part.mass
-                dry_mass += part.dry_mass
                 for child in part.children:
                     stack.append(child)
 
@@ -667,14 +665,14 @@ def analyze_vehicle():
     tb.reverse()
     minThrottle.reverse()
     maxThrottle.reverse()
-    stages = struct()
     vehicle = list()
     for i in range(len(stage)):
+        stages = struct()
         stages.m0 = m0[i]
         stages.fT = fT[i]
         stages.ve = ve[i]
         stages.md = md[i]
-        stage.maxThrottle = maxThrottle[i]
+        stages.maxThrottle = maxThrottle[i]
         stages.minThrottle = minThrottle[i]
         stages.maxT = tb[i]
         vehicle.append(stages)

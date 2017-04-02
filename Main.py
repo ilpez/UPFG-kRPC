@@ -99,6 +99,7 @@ while True:
 print('Main Engine Cutoff')
 
 vessel.control.activate_next_stage()
+vehicle.remove(vehicle[0])
 vessel.control.rcs = True
 vessel.control.forward = 1
 time.sleep(2)
