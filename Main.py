@@ -51,7 +51,7 @@ while (space_center.ut - game_launch_time) < 0:
     print('Time to launch %f' % (space_center.ut - game_launch_time))
     time.sleep(1)
 
-vessel.control.throttle = upfg.throttle_control(g_lim, q_lim)
+vessel.control.throttle = 1
 for engine in vessel.parts.engines:
     if not engine.active:
         print('There is no active engine, checking Propellant condition')
@@ -80,7 +80,7 @@ vessel.auto_pilot.target_heading = azimuth
 vessel.auto_pilot.target_roll = azimuth
 vessel.auto_pilot.attenuation_angle = (1, 1, 0.2)
 while True:
-    vessel.control.throttle = upfg.throttle_control(g_lim, q_lim)
+    vessel.control.throttle = upfg.throttle_control(vehicle, g_lim, q_lim)
     if vessel.auto_pilot.target_roll > 0:
         vessel.auto_pilot.target_roll -= 0.1
     else:
@@ -112,8 +112,7 @@ for engine in vessel.parts.engines:
                 if engine.get_field('Propellant') == 'Very Stable':
                     print('Engine is ready')
                     vessel.control.forward = 0
-                    vessel.control.throttle = upfg.throttle_control(
-                        g_lim, q_lim)
+                    vessel.control.throttle = 1
                     vessel.control.activate_next_stage()
 
 while vessel.thrust < vessel.available_thrust:
@@ -161,9 +160,9 @@ while converged is False:
 
 
 while True:
-    vessel.control.throttle = upfg.throttle_control(g_lim, q_lim)
+    vessel.control.throttle = upfg.throttle_control(vehicle, g_lim, q_lim)
     [upfg_internal, upfg_guided] = upfg.upfg(vehicle, target, upfg_internal)
-    t = upfg_internal.tgo
+    t = upfg_guided.tgo
     if t > 1:
         vessel.auto_pilot.target_heading = upfg_guided.yaw
         vessel.auto_pilot.target_pitch = upfg_guided.pitch

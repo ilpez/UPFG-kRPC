@@ -579,10 +579,10 @@ def rodrigues(vector, axis, angle):
     return rotated
 
 
-def throttle_control(G_limit, Q_limit):
-    min_thrust = vessel.available_thrust * (360 / 934)
-    max_thrust = vessel.available_thrust
-    if max_thrust == 0:
+def throttle_control(vehicle, G_limit, Q_limit):
+    min_thrust = vessel.available_thrust * vehicle[0].minThrottle
+    max_thrust = vessel.available_thrust * vehicle[0].maxThrottle
+    if max_thrust == 0 or max_thrust == min_thrust:
         return 1
     G_thrust = G_limit * Global.state_mass() * g0
     G_throttle = (G_thrust - min_thrust) / (max_thrust - min_thrust)
@@ -602,7 +602,7 @@ def analyze_vehicle():
 
     print(stage)
     m0 = list()
-    m1 = [0] * len(stage)
+    m1 = list()
     fT = list()
     ve = list()
     md = list()
@@ -643,13 +643,13 @@ def analyze_vehicle():
                     stack.append(child)
 
         m0.append(mass)
-        m1[i] = fuel_mass
+        m1.append(fuel_mass)
         for n in range(i):
             m1[i] = m1[i] - m1[n]
         fT.append(thrust[i])
         ve.append(isp[i])
         md.append(fT[i] / ve[i])
-        aT.append(fT[i] / m0[i] / g0)
+        aT.append(fT[i] / m0[i])
         tu.append(ve[i] / aT[i])
         l1.append(ve[i] * np.log(m0[i] / (m0[i] - m1[i])))
         tb.append(m1[i] / md[i])
