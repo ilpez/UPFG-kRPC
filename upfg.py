@@ -1,5 +1,6 @@
 import Global
 import numpy as np
+import time
 
 conn = Global.conn
 space_center = Global.space_center
@@ -145,11 +146,15 @@ def launchTargeting(periapsis,
     Rx = np.array([[1, 0, 0],
                    [0, cosd(inclination), -sind(inclination)],
                    [0, sind(inclination), cosd(inclination)]])
+    Ry = np.array([[cosd(0), 0, sind(0)],
+                   [0, 1, 0],
+                   [-sind(0), 0, cosd(0)]])
     Rz = np.array([[cosd(lan), -sind(lan), 0],
                    [sind(lan), cosd(lan), 0],
                    [0, 0, 1]])
 
-    m1 = np.matmul(Rz, Rx)
+    m0 = np.matmul(Rz, Ry)
+    m1 = np.matmul(m0, Rx)
     m2 = np.transpose([0, 0, -1])
 
     target_plane_normal = np.matmul(m1, m2).transpose()
@@ -217,6 +222,8 @@ def upfg(vehicle, target, previous):
     vgo = vgo - dvsensed
     # vgo1 = vgo
     tb[0] = tb[0] - previous.tb
+    if n > 1 and Global.state_thrust() == 0:
+        stageController(vehicle)
 
     aT[0] = fT[0] / m
     tu[0] = ve[0] / aT[0]
@@ -228,7 +235,8 @@ def upfg(vehicle, target, previous):
         l_ += li[i]
         if l_ > norm(vgo):
             vehicle.remove(vehicle[-1])
-            return(upfg(vehicle, target, previous))
+            print('We have more than what we need')
+            return upfg(vehicle, target, previous)
     li.append(norm(vgo) - l_)
 
     tgoi = list()
@@ -671,6 +679,7 @@ def analyze_vehicle():
         stages.m0 = m0[i]
         stages.fT = fT[i]
         stages.ve = ve[i]
+        stages.l1 = l1[i]
         stages.md = md[i]
         stages.maxThrottle = maxThrottle[i]
         stages.minThrottle = minThrottle[i]
@@ -678,3 +687,17 @@ def analyze_vehicle():
         vehicle.append(stages)
 
     return vehicle
+
+
+def stageController(vehicle, delay=2, ullage=True):
+    time.sleep(delay)
+    vessel.control.activate_next_stage()
+    if ullage:
+        vessel.control.rcs = True
+        vessel.control.forward = 1
+        time.sleep(delay)
+        vessel.control.forward = 0
+    vessel.control.activate_next_stage()
+    vehicle.remove(vehicle[0])
+    if vessel.control.throttle == 0:
+        vessel.control.throttle = 1
