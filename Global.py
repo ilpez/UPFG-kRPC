@@ -3,7 +3,7 @@ import krpc
 conn = krpc.connect(name='Launch to orbit')
 space_center = conn.space_center
 vessel = space_center.active_vessel
-g0 = vessel.orbit.body.surface_gravity
+g0 = 9.80655
 mu = vessel.orbit.body.gravitational_parameter
 
 inertial_reference_frame = vessel.orbit.body.non_rotating_reference_frame
