@@ -8,6 +8,7 @@ import upfg
 conn = Global.conn
 space_center = Global.space_center
 vessel = Global.vessel
+vehicle = upfg.analyze_vehicle()
 
 position = Global.orbital_position
 velocity = Global.orbital_velocity
@@ -34,7 +35,7 @@ elif sys.argv[6] == 'EXP':
     meco_speed = 2700
     turn_speed = 50
 else:
-    meco_speed = 3000
+    meco_speed = vehicle[0].l1
     turn_speed = 50
 print(meco_speed)
 [azimuth, launch_time, target] = upfg.launchTargeting(target_periapsis,
@@ -50,16 +51,9 @@ while (space_center.ut - game_launch_time) < 0:
     print('Time to launch %f' % (space_center.ut - game_launch_time))
     time.sleep(1)
 
-vessel.control.throttle = upfg.throttle_control(g_lim, q_lim)
-for engine in vessel.parts.engines:
-    if not engine.active:
-        print('There is no active engine, checking Propellant condition')
-        for engine in engine.part.modules:
-            if engine.has_field('Propellant'):
-                if engine.get_field('Propellant') == 'Very Stable':
-                    print('Engine is ready')
-                    vessel.control.activate_next_stage()
-while vessel.thrust < vessel.available_thrust:
+vessel.control.throttle = 1
+vessel.control.activate_next_stage()
+while vessel.thrust < Global.state_mass() * g0:
     time.sleep(0.01)
 
 vessel.auto_pilot.engage()
@@ -79,7 +73,7 @@ vessel.auto_pilot.target_heading = azimuth
 vessel.auto_pilot.target_roll = azimuth
 vessel.auto_pilot.attenuation_angle = (1, 1, 0.2)
 while True:
-    vessel.control.throttle = upfg.throttle_control(g_lim, q_lim)
+    vessel.control.throttle = upfg.throttle_control(vehicle, g_lim, q_lim)
     if vessel.auto_pilot.target_roll > 0:
         vessel.auto_pilot.target_roll -= 0.1
     else:
@@ -97,22 +91,7 @@ while True:
 
 print('Main Engine Cutoff')
 
-vessel.control.activate_next_stage()
-vessel.control.rcs = True
-vessel.control.forward = 1
-time.sleep(2)
-
-for engine in vessel.parts.engines:
-    if not engine.active:
-        print('There is no active engine, checking Propellant condition')
-        for engine in engine.part.modules:
-            if engine.has_field('Propellant'):
-                if engine.get_field('Propellant') == 'Very Stable':
-                    print('Engine is ready')
-                    vessel.control.forward = 0
-                    vessel.control.throttle = upfg.throttle_control(
-                        g_lim, q_lim)
-                    vessel.control.activate_next_stage()
+upfg.stageController(vehicle, ullage=False)
 
 while vessel.thrust < vessel.available_thrust:
     time.sleep(0.01)
@@ -137,8 +116,8 @@ upfg_internal.rbias = [0, 0, 0]
 upfg_internal.rd = rdinit
 upfg_internal.rgrav = np.multiply(
     np.multiply(-(mu / 2), position()), 1 / upfg.norm(position())**3)
-upfg_internal.tb = 200
-upfg_internal.time = time.time()
+upfg_internal.tb = 0
+upfg_internal.time = Global.universal_time()
 upfg_internal.tgo = 0
 upfg_internal.v = velocity()
 upfg_internal.vgo = vdinit
@@ -147,9 +126,9 @@ upfg_guided = upfg.struct()
 iteration = 0
 
 while converged is False:
-    [upfg_internal, upfg_guided] = upfg.upfg(target, upfg_internal)
+    [upfg_internal, upfg_guided] = upfg.upfg(vehicle, target, upfg_internal)
     t1 = upfg_internal.tgo
-    [upfg_internal, upfg_guided] = upfg.upfg(target, upfg_internal)
+    [upfg_internal, upfg_guided] = upfg.upfg(vehicle, target, upfg_internal)
     t2 = upfg_internal.tgo
     if abs(t1 - t2) / t2 < 0.01:
         print('Guidance converged after %f iteration'
@@ -159,13 +138,13 @@ while converged is False:
 
 
 while True:
-    vessel.control.throttle = upfg.throttle_control(g_lim, q_lim)
-    [upfg_internal, upfg_guided] = upfg.upfg(target, upfg_internal)
-    t = upfg_internal.tgo
+    vessel.control.throttle = upfg.throttle_control(vehicle, g_lim, q_lim)
+    [upfg_internal, upfg_guided] = upfg.upfg(vehicle, target, upfg_internal)
+    t = upfg_guided.tgo
     if t > 1:
         vessel.auto_pilot.target_heading = upfg_guided.yaw
         vessel.auto_pilot.target_pitch = upfg_guided.pitch
-    if upfg_guided.tgo < 0.1:
+    if t < 0.1:
         vessel.control.throttle = 0
         break
     if Global.orbital_speed() > target.velocity:
@@ -177,5 +156,4 @@ while True:
                 if module.has_event('Jettison'):
                     module.trigger_event('Jettison')
                     fairing_jettison = True
-
 print('Mission Success')
