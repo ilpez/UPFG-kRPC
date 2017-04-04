@@ -415,19 +415,19 @@ def CSEroutine(r0, v0, dt, last):
             xguess = xguess - xp
             xlast = xlast - xp
     else:
-        [dtmax, dump1, dump2, dump3] = KTTI(xmax, sigma0s, alphas, kmax)
+        [dtmax, _, _, _] = KTTI(xmax, sigma0s, alphas, kmax)
         if dtmax < dts:
             while dtmax >= dts:
                 dtmin = dtmax
                 xmin = xmax
                 xmax = 2 * xmax
-                [dtmax, dump1, dump2, dump3] = KTTI(
+                [dtmax, _, _, _] = KTTI(
                     xmax, sigma0s, alphas, kmax)
 
     if xmin >= xguess or xguess >= xmax:
         xguess = 0.5 * (xmin + xmax)
 
-    [dtguess, dump1, dump2, dump3] = KTTI(xguess, sigma0s, alphas, kmax)
+    [dtguess, _, _, _] = KTTI(xguess, sigma0s, alphas, kmax)
 
     if dts < dtguess:
         if xguess < xlast and xlast < xmax \
