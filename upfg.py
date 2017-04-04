@@ -227,22 +227,22 @@ def upfg(vehicle, target, previous):
 
     aT[0] = fT[0] / m
     tu[0] = ve[0] / aT[0]
-    l_ = 0
-    li = list()
+    L = 0
+    Li = list()
 
     for i in range(n - 1):
-        li.append(ve[i] * np.log(tu[i] / (tu[i] - tb[i])))
-        l_ += li[i]
-        if l_ > norm(vgo):
+        Li.append(ve[i] * np.log(tu[i] / (tu[i] - tb[i])))
+        L += Li[i]
+        if L > norm(vgo):
             vehicle.remove(vehicle[-1])
             print('We have more than what we need')
             return upfg(vehicle, target, previous)
-    li.append(norm(vgo) - l_)
+    Li.append(norm(vgo) - L)
 
     tgoi = list()
 
     for i in range(n):
-        tb[i] = tu[i] * (1 - np.exp(-li[i] / ve[i]))
+        tb[i] = tu[i] * (1 - np.exp(-Li[i] / ve[i]))
         if i == 0:
             tgoi.append(tb[i])
         else:
@@ -255,38 +255,38 @@ def upfg(vehicle, target, previous):
     else:
         theta_max = d2r(1)
 
-    l_ = 0
-    s = 0
-    j = 0
-    q = 0
-    p = 0
-    h = 0
-    ji = list()
-    si = list()
-    qi = list()
-    pi = list()
+    L = 0
+    S = 0
+    J = 0
+    Q = 0
+    P = 0
+    H = 0
+    Ji = list()
+    Si = list()
+    Qi = list()
+    Pi = list()
     tgoi1 = 0
 
     for i in range(n):
         if i > 0:
             tgoi1 = tgoi[i - 1]
-        ji.append(tu[i] * li[i] - ve[i] * tb[i])
-        si.append(tb[i] * li[i] - ji[i])
-        qi.append(si[i] * (tu[i] + tgoi1) - 0.5 * ve[i] * tb[i]**2)
-        pi.append(qi[i] * (tu[i] + tgoi1) - 0.5 * ve[i]
+        Ji.append(tu[i] * Li[i] - ve[i] * tb[i])
+        Si.append(tb[i] * Li[i] - Ji[i])
+        Qi.append(Si[i] * (tu[i] + tgoi1) - 0.5 * ve[i] * tb[i]**2)
+        Pi.append(Qi[i] * (tu[i] + tgoi1) - 0.5 * ve[i]
                   * tb[i]**2 * (tb[i] / 3 + tgoi1))
 
-        ji[i] += li[i] * tgoi1
-        si[i] += l_ * tb[i]
-        qi[i] += j * tb[i]
-        pi[i] += h * tb[i]
+        Ji[i] += Li[i] * tgoi1
+        Si[i] += L * tb[i]
+        Qi[i] += J * tb[i]
+        Pi[i] += H * tb[i]
 
-        l_ += li[i]
-        j += ji[i]
-        s += si[i]
-        q += qi[i]
-        p += pi[i]
-        h = j * tgoi[i] - q
+        L += Li[i]
+        J += Ji[i]
+        S += Si[i]
+        Q += Qi[i]
+        P += Pi[i]
+        H = J * tgoi[i] - Q
 
     lamb = unit(vgo)
     # rgrav1 = rgrav
@@ -297,23 +297,23 @@ def upfg(vehicle, target, previous):
     iz = unit(cross(rd, iy))
     # iz1 = iz
     rgoxy = rgo - dot(iz, rgo) * iz
-    rgoz = (s - dot(lamb, rgoxy)) / dot(lamb, iz)
+    rgoz = (S - dot(lamb, rgoxy)) / dot(lamb, iz)
     rgo = rgoxy + rgoz * iz + rbias
-    lambdade = q - s * j / l_
-    lambdadot = (rgo - s * lamb) / lambdade
-    if (norm(lambdadot) * j / l_) > theta_max:
-        lambdadotmag = theta_max / (j / l_)
+    lambdade = Q - S * J / L
+    lambdadot = (rgo - S * lamb) / lambdade
+    if (norm(lambdadot) * J / L) > theta_max:
+        lambdadotmag = theta_max / (J / L)
         lambdadot = unit(lambdadot) * lambdadotmag
-        rgo = s * lamb + lambdade * lambdadot
-    iF = unit(lamb - lambdadot * j / l_)
+        rgo = S * lamb + lambdade * lambdadot
+    iF = unit(lamb - lambdadot * J / L)
     phi = np.arccos(dot(iF, lamb))
-    phidot = -phi * l_ / j
-    vthrust = (l_ - 0.5 * l_ * phi**2 - j * phi *
-               phidot - 0.5 * h * phidot**2) * lamb
-    vthrust = vthrust - (l_ * phi + j * phidot) * unit(lambdadot)
-    rthrust = (s - 0.5 * s * phi**2 - q * phi *
-               phidot - 0.5 * p * phidot**2) * lamb
-    rthrust = rthrust - (s * phi + q * phidot) * unit(lambdadot)
+    phidot = -phi * L / J
+    vthrust = (L - 0.5 * L * phi**2 - J * phi *
+               phidot - 0.5 * H * phidot**2) * lamb
+    vthrust = vthrust - (L * phi + J * phidot) * unit(lambdadot)
+    rthrust = (S - 0.5 * S * phi**2 - Q * phi *
+               phidot - 0.5 * P * phidot**2) * lamb
+    rthrust = rthrust - (S * phi + Q * phidot) * unit(lambdadot)
     vbias = vgo - vthrust
     rbias = rgo - rthrust
 
