@@ -27,16 +27,16 @@ target_lan = float(sys.argv[4])
 target_true_anomaly = float(sys.argv[5])
 if sys.argv[6] == 'RTLS':
     meco_speed = 1700
-    turn_speed = 55
+    turn_speed = 50
 elif sys.argv[6] == 'ASDS':
     meco_speed = 2300
-    turn_speed = 50
+    turn_speed = 30
 elif sys.argv[6] == 'EXP':
     meco_speed = 2700
-    turn_speed = 50
+    turn_speed = 30
 else:
-    meco_speed = vehicle[0].l1
-    turn_speed = 50
+    meco_speed = vehicle[0].l1 - 1000
+    turn_speed = 30
 print(meco_speed)
 [azimuth, launch_time, target] = upfg.launchTargeting(target_periapsis,
                                                       target_apoapsis,
@@ -53,31 +53,29 @@ while (space_center.ut - game_launch_time) < 0:
 
 vessel.control.throttle = 1
 vessel.control.activate_next_stage()
-while vessel.thrust < Global.state_mass() * g0:
+while Global.state_thrust() < vessel.available_thrust:
     time.sleep(0.01)
 
 vessel.auto_pilot.engage()
 vessel.auto_pilot.target_heading = 0
+vessel.auto_pilot.target_roll = 0
 vessel.auto_pilot.target_pitch = 90
+vessel.auto_pilot.wait()
 vessel.control.activate_next_stage()
 
 print('Proceeding Launch..')
 
 while surface_speed() < turn_speed:
-    time.sleep(0.1)
+    pass
 
 print('Clear from launch tower..')
-print('Begin Pitch and Roll Program..')
+print('Begin Pitch Program..')
 
 vessel.auto_pilot.target_heading = azimuth
-vessel.auto_pilot.target_roll = azimuth
-vessel.auto_pilot.attenuation_angle = (1, 1, 0.2)
+
 while True:
     vessel.control.throttle = upfg.throttle_control(vehicle, g_lim, q_lim)
-    if vessel.auto_pilot.target_roll > 0:
-        vessel.auto_pilot.target_roll -= 0.1
-    else:
-        vessel.auto_pilot.target_roll = 0
+
     pitch1 = upfg.atand((900 - turn_speed) / (surface_speed() - turn_speed))
     pitch2 = upfg.angle_from_vec(Global.surface_velocity(),
                                  Global.body_reference_frame,
@@ -91,12 +89,12 @@ while True:
 
 print('Main Engine Cutoff')
 
-upfg.stageController(vehicle, ullage=False)
+upfg.stageController(vehicle)
 
 while vessel.thrust < vessel.available_thrust:
     time.sleep(0.01)
 
-vessel.auto_pilot.target_roll = 0
+
 fairing_jettison = False
 cser = upfg.struct()
 cser.dtcp = 0
@@ -151,8 +149,8 @@ while True:
         vessel.control.throttle = 0
         break
     if Global.surface_altitude() > 110000 and not fairing_jettison:
-        for part in vessel.parts.all:
-            for module in part.modules:
+        for fairing in vessel.parts.fairings:
+            for module in fairing.part.modules:
                 if module.has_event('Jettison'):
                     module.trigger_event('Jettison')
                     fairing_jettison = True
