@@ -3,6 +3,11 @@ import krpc
 conn = krpc.connect(name='Launch to orbit')
 space_center = conn.space_center
 vessel = space_center.active_vessel
+target = None
+if space_center.target_vessel is not None:
+    target = space_center.target_vessel
+elif space_center.target_body is not None:
+    target = space_center.target_body
 g0 = 9.80655
 mu = vessel.orbit.body.gravitational_parameter
 
