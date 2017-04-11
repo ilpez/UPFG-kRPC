@@ -17,9 +17,6 @@ surface_speed = Global.surface_speed
 g0 = Global.g0
 mu = Global.mu
 
-g_lim = 4
-q_lim = 27000
-
 target_apoapsis = float(sys.argv[1])
 target_periapsis = float(sys.argv[2])
 target_inclination = float(sys.argv[3])
@@ -28,15 +25,23 @@ target_true_anomaly = float(sys.argv[5])
 if sys.argv[6] == 'RTLS':
     meco_speed = 1700
     turn_speed = 30
+    g_lim = 3
+    q_lim = 27000
 elif sys.argv[6] == 'ASDS':
     meco_speed = 2300
     turn_speed = 30
+    g_lim = 5
+    q_lim = 31000
 elif sys.argv[6] == 'EXP':
     meco_speed = 2700
     turn_speed = 30
+    g_lim = 5
+    q_lim = 33000
 else:
     meco_speed = vehicle[0].l1 - 1000
     turn_speed = 30
+    g_lim = 5
+    q_lim = 33000
 print(meco_speed)
 [azimuth, launch_time, target] = upfg.launchTargeting(target_periapsis,
                                                       target_apoapsis,
