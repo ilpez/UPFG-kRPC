@@ -55,6 +55,7 @@ vessel.control.throttle = 1
 vessel.control.activate_next_stage()
 while Global.state_thrust() < vessel.available_thrust:
     time.sleep(0.01)
+    time.sleep(0.2)
 
 vessel.auto_pilot.engage()
 vessel.auto_pilot.target_heading = 0
