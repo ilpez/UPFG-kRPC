@@ -104,7 +104,8 @@ def launchTargeting(periapsis,
     radius = (semimajor_axis * (1 - ecc**2)) / (1 + ecc * cosd(true_anomaly))
     velocity = np.sqrt((velocity_periapsis**2) + 2 * mu *
                        ((1 / radius) - (1 / periapsis)))
-    angle = 90 - asind((periapsis * velocity_periapsis) / (radius * velocity))
+    angle = acosd(np.clip((periapsis * velocity_periapsis) /
+                          (radius * velocity), -1, 1))
     descending = False
     if inclination < 0:
         descending = True
@@ -229,7 +230,7 @@ def upfg(vehicle, target, previous):
     vgo = vgo - dvsensed
     # vgo1 = vgo
     tb[0] = tb[0] - previous.tb
-
+    fT[0] = Global.state_thrust()
     aT[0] = fT[0] / m
     tu[0] = ve[0] / aT[0]
     L = 0
@@ -694,17 +695,21 @@ def analyze_vehicle():
     return vehicle
 
 
-def stageController(vehicle, delay=2, ullage=True):
-    time.sleep(delay)
-    vessel.control.activate_next_stage()
-    if ullage:
-        vessel.control.rcs = True
-        vessel.control.forward = 1
+def stageController(vehicle, delay=2, ullage=True, booster=False):
+    if not booster:
+        vessel.control.throttle = 0
         time.sleep(delay)
-        vessel.control.forward = 0
-    vessel.control.activate_next_stage()
-    vehicle.remove(vehicle[0])
-    if vessel.control.throttle == 0:
-        vessel.control.throttle = 1
+        vessel.control.activate_next_stage()
+        if ullage:
+            vessel.control.rcs = True
+            vessel.control.forward = 1
+            time.sleep(2 * delay)
+            vessel.control.forward = 0
+        vessel.control.activate_next_stage()
+        vehicle.remove(vehicle[0])
+        if vessel.control.throttle == 0:
+            vessel.control.throttle = 1
+    if booster:
+        vessel.control.activate_next_stage()
     while Global.state_thrust() < vessel.available_thrust:
         time.sleep(0.01)

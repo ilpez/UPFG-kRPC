@@ -27,7 +27,7 @@ target_lan = float(sys.argv[4])
 target_true_anomaly = float(sys.argv[5])
 if sys.argv[6] == 'RTLS':
     meco_speed = 1700
-    turn_speed = 50
+    turn_speed = 30
 elif sys.argv[6] == 'ASDS':
     meco_speed = 2300
     turn_speed = 30
@@ -54,15 +54,14 @@ while (space_center.ut - game_launch_time) < 0:
 vessel.control.throttle = 1
 vessel.control.activate_next_stage()
 while Global.state_thrust() < vessel.available_thrust:
-    time.sleep(0.01)
     time.sleep(0.2)
 
 vessel.auto_pilot.engage()
-vessel.auto_pilot.target_heading = 0
+vessel.auto_pilot.target_heading = 90
 vessel.auto_pilot.target_roll = 0
 vessel.auto_pilot.target_pitch = 90
-vessel.auto_pilot.wait()
 vessel.control.activate_next_stage()
+vessel.auto_pilot.wait()
 
 print('Proceeding Launch..')
 
@@ -77,24 +76,19 @@ vessel.auto_pilot.target_heading = azimuth
 while True:
     vessel.control.throttle = upfg.throttle_control(vehicle, g_lim, q_lim)
 
-    pitch1 = upfg.atand((900 - turn_speed) / (surface_speed() - turn_speed))
+    pitch1 = upfg.atand((900 - 2 * turn_speed) /
+                        (surface_speed() - turn_speed))
     pitch2 = upfg.angle_from_vec(Global.surface_velocity(),
                                  Global.body_reference_frame,
                                  'pitch')
     vessel.auto_pilot.target_pitch = min(pitch1, pitch2)
     if surface_speed() > meco_speed or vessel.available_thrust == 0:
-        vessel.control.throttle = 0
-        time.sleep(2)
         break
     time.sleep(0.01)
 
 print('Main Engine Cutoff')
 
 upfg.stageController(vehicle)
-
-while vessel.thrust < vessel.available_thrust:
-    time.sleep(0.01)
-
 
 fairing_jettison = False
 cser = upfg.struct()
@@ -130,11 +124,10 @@ while converged is False:
     [upfg_internal, upfg_guided] = upfg.upfg(vehicle, target, upfg_internal)
     t2 = upfg_internal.tgo
     if abs(t1 - t2) / t2 < 0.01:
-        print('Guidance converged after %f iteration'
-              % iteration)
         converged = True
     iteration += 1
 
+print('Guidance converged after %f iteration' % iteration)
 
 while True:
     vessel.control.throttle = upfg.throttle_control(vehicle, g_lim, q_lim)
