@@ -66,7 +66,7 @@ vessel.auto_pilot.wait()
 print('Proceeding Launch..')
 
 while surface_speed() < turn_speed:
-    pass
+    time.sleep(0.2)
 
 print('Clear from launch tower..')
 print('Begin Pitch Program..')
