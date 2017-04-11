@@ -56,9 +56,9 @@ while (space_center.ut - game_launch_time) < 0:
     print('Time to launch %f' % (space_center.ut - game_launch_time))
     time.sleep(1)
 
-vessel.control.throttle = 1
 vessel.control.activate_next_stage()
 while Global.state_thrust() < vessel.available_thrust:
+    vessel.control.throttle = 1
     time.sleep(0.2)
 
 vessel.auto_pilot.engage()
