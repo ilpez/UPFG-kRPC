@@ -1,6 +1,7 @@
 import Global
 import numpy as np
 import time
+from collections import OrderedDict
 
 conn = Global.conn
 space_center = Global.space_center
@@ -103,7 +104,8 @@ def launchTargeting(periapsis,
     radius = (semimajor_axis * (1 - ecc**2)) / (1 + ecc * cosd(true_anomaly))
     velocity = np.sqrt((velocity_periapsis**2) + 2 * mu *
                        ((1 / radius) - (1 / periapsis)))
-    angle = 90 - asind((periapsis * velocity_periapsis) / (radius * velocity))
+    angle = acosd(np.clip((periapsis * velocity_periapsis) /
+                          (radius * velocity), -1, 1))
     descending = False
     if inclination < 0:
         descending = True
@@ -130,12 +132,15 @@ def launchTargeting(periapsis,
                                tand(inclination))
     if descending:
         relative_longitude = 180 - relative_longitude
-    # earth_meridian = vessel.orbit.body.msl_position(0, 0, surfref)
-    prime_meridian = vessel.orbit.body.msl_position(0, 0, orbref)
-    rotational_angle = atan2d(dot(local_z, prime_meridian),
-                              dot(local_x, prime_meridian))
-    if rotational_angle < 0:
-        rotational_angle += 360
+    rotational_angle = 0
+    if conn.krpc.get_status().version == '0.3.6':
+        prime_meridian = vessel.orbit.body.msl_position(0, 0, orbref)
+        rotational_angle = atan2d(dot(local_z, prime_meridian),
+                                  dot(local_x, prime_meridian))
+        if rotational_angle < 0:
+            rotational_angle += 360
+    else:
+        rotational_angle = r2d(vessel.orbit.body.rotation_angle)
     print(rotational_angle)
     geo_longitude = lan + relative_longitude - rotational_angle
     geo_longitude = np.mod(geo_longitude + 360, 360)
@@ -208,11 +213,14 @@ def upfg(vehicle, target, previous):
     aT = list()
     tu = list()
     tb = list()
+    if n > 1 and Global.state_thrust() == 0:
+        stageController(vehicle)
+        return upfg(vehicle, target, previous)
 
     for i in range(n):
         fT.append(vehicle[i].fT)
-        md.append(vehicle[i].md)
         ve.append(vehicle[i].ve)
+        md.append(fT[i] / ve[i])
         aT.append(fT[i] / vehicle[i].m0)
         tu.append(ve[i] / aT[i])
         tb.append(vehicle[i].maxT)
@@ -222,27 +230,25 @@ def upfg(vehicle, target, previous):
     vgo = vgo - dvsensed
     # vgo1 = vgo
     tb[0] = tb[0] - previous.tb
-    if n > 1 and Global.state_thrust() == 0:
-        stageController(vehicle)
-
+    fT[0] = Global.state_thrust()
     aT[0] = fT[0] / m
     tu[0] = ve[0] / aT[0]
-    l_ = 0
-    li = list()
+    L = 0
+    Li = list()
 
     for i in range(n - 1):
-        li.append(ve[i] * np.log(tu[i] / (tu[i] - tb[i])))
-        l_ += li[i]
-        if l_ > norm(vgo):
+        Li.append(ve[i] * np.log(tu[i] / (tu[i] - tb[i])))
+        L += Li[i]
+        if L > norm(vgo):
             vehicle.remove(vehicle[-1])
             print('We have more than what we need')
             return upfg(vehicle, target, previous)
-    li.append(norm(vgo) - l_)
+    Li.append(norm(vgo) - L)
 
     tgoi = list()
 
     for i in range(n):
-        tb[i] = tu[i] * (1 - np.exp(-li[i] / ve[i]))
+        tb[i] = tu[i] * (1 - np.exp(-Li[i] / ve[i]))
         if i == 0:
             tgoi.append(tb[i])
         else:
@@ -255,38 +261,38 @@ def upfg(vehicle, target, previous):
     else:
         theta_max = d2r(1)
 
-    l_ = 0
-    s = 0
-    j = 0
-    q = 0
-    p = 0
-    h = 0
-    ji = list()
-    si = list()
-    qi = list()
-    pi = list()
+    L = 0
+    S = 0
+    J = 0
+    Q = 0
+    P = 0
+    H = 0
+    Ji = list()
+    Si = list()
+    Qi = list()
+    Pi = list()
     tgoi1 = 0
 
     for i in range(n):
         if i > 0:
             tgoi1 = tgoi[i - 1]
-        ji.append(tu[i] * li[i] - ve[i] * tb[i])
-        si.append(tb[i] * li[i] - ji[i])
-        qi.append(si[i] * (tu[i] + tgoi1) - 0.5 * ve[i] * tb[i]**2)
-        pi.append(qi[i] * (tu[i] + tgoi1) - 0.5 * ve[i]
+        Ji.append(tu[i] * Li[i] - ve[i] * tb[i])
+        Si.append(tb[i] * Li[i] - Ji[i])
+        Qi.append(Si[i] * (tu[i] + tgoi1) - 0.5 * ve[i] * tb[i]**2)
+        Pi.append(Qi[i] * (tu[i] + tgoi1) - 0.5 * ve[i]
                   * tb[i]**2 * (tb[i] / 3 + tgoi1))
 
-        ji[i] += li[i] * tgoi1
-        si[i] += l_ * tb[i]
-        qi[i] += j * tb[i]
-        pi[i] += h * tb[i]
+        Ji[i] += Li[i] * tgoi1
+        Si[i] += L * tb[i]
+        Qi[i] += J * tb[i]
+        Pi[i] += H * tb[i]
 
-        l_ += li[i]
-        j += ji[i]
-        s += si[i]
-        q += qi[i]
-        p += pi[i]
-        h = j * tgoi[i] - q
+        L += Li[i]
+        J += Ji[i]
+        S += Si[i]
+        Q += Qi[i]
+        P += Pi[i]
+        H = J * tgoi[i] - Q
 
     lamb = unit(vgo)
     # rgrav1 = rgrav
@@ -297,23 +303,23 @@ def upfg(vehicle, target, previous):
     iz = unit(cross(rd, iy))
     # iz1 = iz
     rgoxy = rgo - dot(iz, rgo) * iz
-    rgoz = (s - dot(lamb, rgoxy)) / dot(lamb, iz)
+    rgoz = (S - dot(lamb, rgoxy)) / dot(lamb, iz)
     rgo = rgoxy + rgoz * iz + rbias
-    lambdade = q - s * j / l_
-    lambdadot = (rgo - s * lamb) / lambdade
-    if (norm(lambdadot) * j / l_) > theta_max:
-        lambdadotmag = theta_max / (j / l_)
+    lambdade = Q - S * J / L
+    lambdadot = (rgo - S * lamb) / lambdade
+    if (norm(lambdadot) * J / L) > theta_max:
+        lambdadotmag = theta_max / (J / L)
         lambdadot = unit(lambdadot) * lambdadotmag
-        rgo = s * lamb + lambdade * lambdadot
-    iF = unit(lamb - lambdadot * j / l_)
+        rgo = S * lamb + lambdade * lambdadot
+    iF = unit(lamb - lambdadot * J / L)
     phi = np.arccos(dot(iF, lamb))
-    phidot = -phi * l_ / j
-    vthrust = (l_ - 0.5 * l_ * phi**2 - j * phi *
-               phidot - 0.5 * h * phidot**2) * lamb
-    vthrust = vthrust - (l_ * phi + j * phidot) * unit(lambdadot)
-    rthrust = (s - 0.5 * s * phi**2 - q * phi *
-               phidot - 0.5 * p * phidot**2) * lamb
-    rthrust = rthrust - (s * phi + q * phidot) * unit(lambdadot)
+    phidot = -phi * L / J
+    vthrust = (L - 0.5 * L * phi**2 - J * phi *
+               phidot - 0.5 * H * phidot**2) * lamb
+    vthrust = vthrust - (L * phi + J * phidot) * unit(lambdadot)
+    rthrust = (S - 0.5 * S * phi**2 - Q * phi *
+               phidot - 0.5 * P * phidot**2) * lamb
+    rthrust = rthrust - (S * phi + Q * phidot) * unit(lambdadot)
     vbias = vgo - vthrust
     rbias = rgo - rthrust
 
@@ -415,19 +421,19 @@ def CSEroutine(r0, v0, dt, last):
             xguess = xguess - xp
             xlast = xlast - xp
     else:
-        [dtmax, dump1, dump2, dump3] = KTTI(xmax, sigma0s, alphas, kmax)
+        [dtmax, _, _, _] = KTTI(xmax, sigma0s, alphas, kmax)
         if dtmax < dts:
             while dtmax >= dts:
                 dtmin = dtmax
                 xmin = xmax
                 xmax = 2 * xmax
-                [dtmax, dump1, dump2, dump3] = KTTI(
+                [dtmax, _, _, _] = KTTI(
                     xmax, sigma0s, alphas, kmax)
 
     if xmin >= xguess or xguess >= xmax:
         xguess = 0.5 * (xmin + xmax)
 
-    [dtguess, dump1, dump2, dump3] = KTTI(xguess, sigma0s, alphas, kmax)
+    [dtguess, _, _, _] = KTTI(xguess, sigma0s, alphas, kmax)
 
     if dts < dtguess:
         if xguess < xlast and xlast < xmax \
@@ -590,7 +596,7 @@ def rodrigues(vector, axis, angle):
 def throttle_control(vehicle, G_limit, Q_limit):
     min_thrust = vessel.available_thrust * vehicle[0].minThrottle
     max_thrust = vessel.available_thrust * vehicle[0].maxThrottle
-    if max_thrust == 0 or max_thrust == min_thrust:
+    if max_thrust == 0 or vehicle[0].minThrottle == 1:
         return 1
     G_thrust = G_limit * Global.state_mass() * g0
     G_throttle = (G_thrust - min_thrust) / (max_thrust - min_thrust)
@@ -608,65 +614,66 @@ def analyze_vehicle():
         if part.engine is not None:
             stage.append(part.engine.part.decouple_stage)
 
+    stage = list(OrderedDict.fromkeys(stage))
     print(stage)
     m0 = list()
     m1 = list()
     fT = list()
     ve = list()
-    md = list()
     aT = list()
     tu = list()
     l1 = list()
     tb = list()
     maxThrottle = list()
     minThrottle = list()
+    mass = 0
+
     for i in range(len(stage)):
-        stack = [vessel.parts.root]
-        mass = 0
-        thrust = list()
-        isp = list()
+        part_list = vessel.parts.in_decouple_stage(stage[i])
         fuel_name = list()
-        fuel_mass = 0
-        while len(stack) > 0:
-            part = stack.pop()
-            # print(part.title)
+        thrust = 0
+        maxThrust = 0
+        minThrust = 0
+        flow_rate = 0
+        isp = 0
+        for part in part_list:
+            mass += part.mass
             if part.engine is not None:
-                thrust.append(part.engine.max_vacuum_thrust)
-                isp.append(part.engine.vacuum_specific_impulse * g0)
-                fuel_name = part.engine.propellants
-                for fuel in fuel_name:
-                    parent = part.engine.part.parent
-                    fuel_mass += parent.resources.amount(fuel.name) * \
-                        parent.resources.density(fuel.name)
-                if i == len(stage) - 1:
-                    part.engine.thrust_limit = 0
-                    minThrottle.append(part.engine.available_thrust /
-                                       part.engine.max_thrust)
-                    part.engine.thrust_limit = 1
-                    maxThrottle.append(part.engine.available_thrust /
-                                       part.engine.max_thrust)
-            if part.decouple_stage <= stage[i]:
-                mass += part.mass
-                for child in part.children:
-                    stack.append(child)
+                thrust += part.engine.max_vacuum_thrust
+                isp += part.engine.vacuum_specific_impulse * g0
+                flow_rate += thrust / isp
+                for fuel in part.engine.propellants:
+                    fuel_name.append(fuel.name)
+                prev_limit = part.engine.thrust_limit
+                part.engine.thrust_limit = 0
+                minThrust += part.engine.available_thrust
+                part.engine.thrust_limit = prev_limit
+                maxThrust += part.engine.available_thrust
+
+        resources_list = vessel.resources_in_decouple_stage(
+            stage[i] + 1, False)
+        fuel_mass = 0
+        fuel_name = list(OrderedDict.fromkeys(fuel_name))
+        for fuel in fuel_name:
+            fuel_amount = resources_list.amount(fuel)
+            fuel_density = resources_list.density(fuel)
+            fuel_mass += fuel_amount * fuel_density
 
         m0.append(mass)
         m1.append(fuel_mass)
-        for n in range(i):
-            m1[i] = m1[i] - m1[n]
-        fT.append(thrust[i])
-        ve.append(isp[i])
-        md.append(fT[i] / ve[i])
-        aT.append(fT[i] / m0[i])
-        tu.append(ve[i] / aT[i])
-        l1.append(ve[i] * np.log(m0[i] / (m0[i] - m1[i])))
-        tb.append(m1[i] / md[i])
+        fT.append(thrust)
+        ve.append(thrust / flow_rate)
+        aT.append(thrust / mass)
+        tb.append(fuel_mass / flow_rate)
+        tu.append(ve[i] * mass / thrust)
+        l1.append(ve[i] * np.log(tu[i] / (tu[i] - tb[i])))
+        minThrottle.append(minThrust / maxThrust)
+        maxThrottle.append(maxThrust / maxThrust)
 
     m0.reverse()
     m1.reverse()
     fT.reverse()
     ve.reverse()
-    md.reverse()
     aT.reverse()
     tu.reverse()
     l1.reverse()
@@ -680,7 +687,6 @@ def analyze_vehicle():
         stages.fT = fT[i]
         stages.ve = ve[i]
         stages.l1 = l1[i]
-        stages.md = md[i]
         stages.maxThrottle = maxThrottle[i]
         stages.minThrottle = minThrottle[i]
         stages.maxT = tb[i]
@@ -689,15 +695,21 @@ def analyze_vehicle():
     return vehicle
 
 
-def stageController(vehicle, delay=2, ullage=True):
-    time.sleep(delay)
-    vessel.control.activate_next_stage()
-    if ullage:
-        vessel.control.rcs = True
-        vessel.control.forward = 1
+def stageController(vehicle, delay=2, ullage=True, booster=False):
+    if not booster:
+        vessel.control.throttle = 0
         time.sleep(delay)
-        vessel.control.forward = 0
-    vessel.control.activate_next_stage()
-    vehicle.remove(vehicle[0])
-    if vessel.control.throttle == 0:
-        vessel.control.throttle = 1
+        vessel.control.activate_next_stage()
+        if ullage:
+            vessel.control.rcs = True
+            vessel.control.forward = 1
+            time.sleep(2 * delay)
+            vessel.control.forward = 0
+        vessel.control.activate_next_stage()
+        vehicle.remove(vehicle[0])
+        if vessel.control.throttle == 0:
+            vessel.control.throttle = 1
+    if booster:
+        vessel.control.activate_next_stage()
+    while Global.state_thrust() < vessel.available_thrust:
+        time.sleep(0.01)
