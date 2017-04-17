@@ -109,6 +109,7 @@ vdinit = np.multiply(target.velocity, upfg.unit(
     upfg.cross(-target.normal, rdinit)))
 vdinit = vdinit - velocity()
 upfg_internal = upfg.struct()
+upfg_internal.init = True
 upfg_internal.cser = cser
 upfg_internal.rbias = [0, 0, 0]
 upfg_internal.rd = rdinit
