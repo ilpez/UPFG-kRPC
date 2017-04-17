@@ -344,23 +344,22 @@ def upfg(vehicle, target, previous):
     vd = vdval * mx
     vgo = vd - v - vgrav + vbias
 
-    current = struct()
-    current.cser = cser
-    current.rbias = rbias
-    current.rd = rd
-    current.rgrav = rgrav
-    current.tb = previous.tb + dt
-    current.time = t
-    current.tgo = tgo
-    current.v = v
-    current.vgo = vgo
+    previous.cser = cser
+    previous.rbias = rbias
+    previous.rd = rd
+    previous.rgrav = rgrav
+    previous.tb = previous.tb + dt
+    previous.time = t
+    previous.tgo = tgo
+    previous.v = v
+    previous.vgo = vgo
 
     guidance = struct()
     guidance.pitch = pitch
     guidance.yaw = yaw
     guidance.tgo = tgo
 
-    return [current, guidance]
+    return [previous, guidance]
 
 
 def CSEroutine(r0, v0, dt, last):
