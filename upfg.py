@@ -188,14 +188,10 @@ def angle_from_vec(x, ref, angle):
 
 
 def upfg(vehicle, target, previous):
-
-    # Variable Init
-    if previous.init:
-        gamma = target.angle
-        iy = np.asarray(target.normal)
-        rdval = target.radius
-        vdval = target.velocity
-        previous.init = False
+    gamma = target.angle
+    iy = np.asarray(target.normal)
+    rdval = target.radius
+    vdval = target.velocity
     t = Global.universal_time()
     m = Global.state_mass()
     r = Global.orbital_position()
