@@ -109,7 +109,7 @@ def launch_targeting(periapsis,
     radius = (semimajor_axis * (1 - ecc ** 2)) / (1 + ecc * cosd(true_anomaly))
     velocity = np.sqrt((velocity_periapsis ** 2) + 2 * mu *
                        ((1 / radius) - (1 / periapsis)))
-    angle = (periapsis * velocity_periapsis) / (radius * velocity)
+    angle = acosd((periapsis * velocity_periapsis) / (radius * velocity))
     descending = False
     if inclination < 0:
         descending = True
