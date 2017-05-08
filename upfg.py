@@ -1,7 +1,9 @@
-import Global
-import numpy as np
 import time
 from collections import OrderedDict
+
+import numpy as np
+
+import Global
 
 conn = Global.conn
 space_center = Global.space_center
@@ -11,7 +13,8 @@ g0 = Global.g0
 # For ease of use
 orbref = vessel.orbit.body.non_rotating_reference_frame
 
-# Trigon function in degrees :)
+
+# Trigonometric function in degrees :)
 
 
 def r2d(x):
@@ -27,6 +30,7 @@ def cosd(x):
 
 
 def acosd(x):
+    np.clip(x, -1, 1)
     return r2d(np.arccos(x))
 
 
@@ -35,6 +39,7 @@ def sind(x):
 
 
 def asind(x):
+    np.clip(x, -1, 1)
     return r2d(np.arcsin(x))
 
 
@@ -78,16 +83,16 @@ def vang(x, y):
     return acosd(np.clip(dot(x, y), -1, 1))
 
 
-class struct():
+class struct:
     pass
 
 
-def launchTargeting(periapsis,
-                    apoapsis,
-                    inclination,
-                    lan,
-                    true_anomaly=0,
-                    slip=-1.5):
+def launch_targeting(periapsis,
+                     apoapsis,
+                     inclination,
+                     lan,
+                     true_anomaly=0,
+                     slip=-1.5):
     # surfref = vessel.orbit.body.reference_frame
     local_x = [1, 0, 0]
     # local_y = [0, 1, 0]
@@ -101,11 +106,10 @@ def launchTargeting(periapsis,
     ecc = (apoapsis - periapsis) / (apoapsis + periapsis)
     velocity_periapsis = np.sqrt(
         (mu * apoapsis) / (periapsis * semimajor_axis))
-    radius = (semimajor_axis * (1 - ecc**2)) / (1 + ecc * cosd(true_anomaly))
-    velocity = np.sqrt((velocity_periapsis**2) + 2 * mu *
+    radius = (semimajor_axis * (1 - ecc ** 2)) / (1 + ecc * cosd(true_anomaly))
+    velocity = np.sqrt((velocity_periapsis ** 2) + 2 * mu *
                        ((1 / radius) - (1 / periapsis)))
-    angle = acosd(np.clip((periapsis * velocity_periapsis) /
-                          (radius * velocity), -1, 1))
+    angle = (periapsis * velocity_periapsis) / (radius * velocity)
     descending = False
     if inclination < 0:
         descending = True
@@ -132,7 +136,6 @@ def launchTargeting(periapsis,
                                tand(inclination))
     if descending:
         relative_longitude = 180 - relative_longitude
-    rotational_angle = 0
     if conn.krpc.get_status().version == '0.3.6':
         prime_meridian = vessel.orbit.body.msl_position(0, 0, orbref)
         rotational_angle = atan2d(dot(local_z, prime_meridian),
@@ -148,18 +151,18 @@ def launchTargeting(periapsis,
     node_angle = np.mod(node_angle + 360 + slip, 360)
     launch_time = (node_angle / 360) * vessel.orbit.body.rotational_period
 
-    Rx = np.array([[1, 0, 0],
+    rx = np.array([[1, 0, 0],
                    [0, cosd(inclination), -sind(inclination)],
                    [0, sind(inclination), cosd(inclination)]])
-    Ry = np.array([[cosd(0), 0, sind(0)],
+    ry = np.array([[cosd(0), 0, sind(0)],
                    [0, 1, 0],
                    [-sind(0), 0, cosd(0)]])
-    Rz = np.array([[cosd(lan), -sind(lan), 0],
+    rz = np.array([[cosd(lan), -sind(lan), 0],
                    [sind(lan), cosd(lan), 0],
                    [0, 0, 1]])
 
-    m0 = np.matmul(Rz, Ry)
-    m1 = np.matmul(m0, Rx)
+    m0 = np.matmul(rz, ry)
+    m1 = np.matmul(m0, rx)
     m2 = np.transpose([0, 0, -1])
 
     target_plane_normal = np.matmul(m1, m2).transpose()
@@ -169,7 +172,7 @@ def launchTargeting(periapsis,
     target.angle = angle
     target.velocity = velocity
 
-    return (azimuth, launch_time, target)
+    return azimuth, launch_time, target
 
 
 def angle_from_vec(x, ref, angle):
@@ -179,12 +182,12 @@ def angle_from_vec(x, ref, angle):
     surface_frame = vessel.surface_reference_frame
     vector = space_center.transform_direction(x, ref, surface_frame)
     if angle == 'pitch':
-        out = 90 - vang(up, vector)
+        return 90 - vang(up, vector)
     elif angle == 'yaw':
         out = atan2d(dot(east, vector), dot(north, vector))
         if out < 0:
             out += 360
-    return out
+        return out
 
 
 def upfg(vehicle, target, previous):
@@ -209,8 +212,8 @@ def upfg(vehicle, target, previous):
     n = len(vehicle)
     md = list()
     ve = list()
-    fT = list()
-    aT = list()
+    f_t = list()
+    a_t = list()
     tu = list()
     tb = list()
     if n > 1 and Global.state_thrust() == 0:
@@ -218,11 +221,11 @@ def upfg(vehicle, target, previous):
         return upfg(vehicle, target, previous)
 
     for i in range(n):
-        fT.append(vehicle[i].fT)
+        f_t.append(vehicle[i].fT)
         ve.append(vehicle[i].ve)
-        md.append(fT[i] / ve[i])
-        aT.append(fT[i] / vehicle[i].m0)
-        tu.append(ve[i] / aT[i])
+        md.append(f_t[i] / ve[i])
+        a_t.append(f_t[i] / vehicle[i].m0)
+        tu.append(ve[i] / a_t[i])
         tb.append(vehicle[i].maxT)
 
     dt = t - tp
@@ -230,9 +233,9 @@ def upfg(vehicle, target, previous):
     vgo = vgo - dvsensed
     # vgo1 = vgo
     tb[0] = tb[0] - previous.tb
-    fT[0] = Global.state_thrust()
-    aT[0] = fT[0] / m
-    tu[0] = ve[0] / aT[0]
+    f_t[0] = Global.state_thrust()
+    a_t[0] = f_t[0] / m
+    tu[0] = ve[0] / a_t[0]
     L = 0
     Li = list()
 
@@ -278,9 +281,9 @@ def upfg(vehicle, target, previous):
             tgoi1 = tgoi[i - 1]
         Ji.append(tu[i] * Li[i] - ve[i] * tb[i])
         Si.append(tb[i] * Li[i] - Ji[i])
-        Qi.append(Si[i] * (tu[i] + tgoi1) - 0.5 * ve[i] * tb[i]**2)
+        Qi.append(Si[i] * (tu[i] + tgoi1) - 0.5 * ve[i] * tb[i] ** 2)
         Pi.append(Qi[i] * (tu[i] + tgoi1) - 0.5 * ve[i]
-                  * tb[i]**2 * (tb[i] / 3 + tgoi1))
+                  * tb[i] ** 2 * (tb[i] / 3 + tgoi1))
 
         Ji[i] += Li[i] * tgoi1
         Si[i] += L * tb[i]
@@ -297,7 +300,7 @@ def upfg(vehicle, target, previous):
     lamb = unit(vgo)
     # rgrav1 = rgrav
     if previous.tgo != 0:
-        rgrav = (tgo / previous.tgo)**2 * rgrav
+        rgrav = (tgo / previous.tgo) ** 2 * rgrav
     rgo = rd - (r + v * tgo + rgrav)
     # rgo1 = rgo
     iz = unit(cross(rd, iy))
@@ -311,25 +314,25 @@ def upfg(vehicle, target, previous):
         lambdadotmag = theta_max / (J / L)
         lambdadot = unit(lambdadot) * lambdadotmag
         rgo = S * lamb + lambdade * lambdadot
-    iF = unit(lamb - lambdadot * J / L)
-    phi = np.arccos(dot(iF, lamb))
+    i_f = unit(lamb - lambdadot * J / L)
+    phi = np.arccos(dot(i_f, lamb))
     phidot = -phi * L / J
-    vthrust = (L - 0.5 * L * phi**2 - J * phi *
-               phidot - 0.5 * H * phidot**2) * lamb
+    vthrust = (L - 0.5 * L * phi ** 2 - J * phi *
+               phidot - 0.5 * H * phidot ** 2) * lamb
     vthrust = vthrust - (L * phi + J * phidot) * unit(lambdadot)
-    rthrust = (S - 0.5 * S * phi**2 - Q * phi *
-               phidot - 0.5 * P * phidot**2) * lamb
+    rthrust = (S - 0.5 * S * phi ** 2 - Q * phi *
+               phidot - 0.5 * P * phidot ** 2) * lamb
     rthrust = rthrust - (S * phi + Q * phidot) * unit(lambdadot)
     vbias = vgo - vthrust
     rbias = rgo - rthrust
 
-    iF = [iF[0], iF[2], iF[1]]
-    pitch = angle_from_vec(iF, orbref, 'pitch')
-    yaw = angle_from_vec(iF, orbref, 'yaw')
+    i_f = [i_f[0], i_f[2], i_f[1]]
+    pitch = angle_from_vec(i_f, orbref, 'pitch')
+    yaw = angle_from_vec(i_f, orbref, 'yaw')
 
     rc1 = r - 0.1 * rthrust - vthrust * tgo / 30
     vc1 = v + rthrust * 1.2 / tgo - 0.1 * vthrust
-    [rc2, vc2, cser] = CSEroutine(rc1, vc1, tgo, cser)
+    [rc2, vc2, cser] = cse_routine(rc1, vc1, tgo, cser)
     vgrav = vc2 - vc1
     rgrav = rc2 - rc1 - vc1 * tgo
 
@@ -362,7 +365,7 @@ def upfg(vehicle, target, previous):
     return [previous, guidance]
 
 
-def CSEroutine(r0, v0, dt, last):
+def cse_routine(r0, v0, dt, last):
     r0 = np.asarray(r0)
     v0 = np.asarray(v0)
     if last.dtcp == 0:
@@ -407,7 +410,7 @@ def CSEroutine(r0, v0, dt, last):
     dtlast = f3 * dtcp
     dtmin = 0
 
-    xmax = 2 * np.pi / np.sqrt(abs(alphas))
+    xmax = np.divide(2 * np.pi, np.sqrt(np.abs(alphas)))
 
     if alphas > 0:
         dtmax = xmax / alphas
@@ -425,9 +428,8 @@ def CSEroutine(r0, v0, dt, last):
             while dtmax >= dts:
                 dtmin = dtmax
                 xmin = xmax
-                xmax = 2 * xmax
-                [dtmax, _, _, _] = KTTI(
-                    xmax, sigma0s, alphas, kmax)
+                xmax = np.multiply(2, xmax)
+                [dtmax, _, _, _] = KTTI(xmax, sigma0s, alphas, kmax)
 
     if xmin >= xguess or xguess >= xmax:
         xguess = 0.5 * (xmin + xmax)
@@ -435,15 +437,15 @@ def CSEroutine(r0, v0, dt, last):
     [dtguess, _, _, _] = KTTI(xguess, sigma0s, alphas, kmax)
 
     if dts < dtguess:
-        if xguess < xlast and xlast < xmax \
-                and dtguess < dtlast and dtlast < dtmax:
-            xmax = xlast
-            dtmax = dtlast
+        if xguess < xlast < xmax:
+            if dtguess < dtlast < dtmax:
+                xmax = xlast
+                dtmax = dtlast
     else:
-        if xmin < xlast and xlast < xguess \
-                and dtmin < dtlast and dtlast < dtguess:
-            xmin = xlast
-            dtmin = dtlast
+        if xmin < xlast < xguess:
+            if dtmin < dtlast < dtguess:
+                xmin = xlast
+                dtmin = dtlast
 
     [xguess, dtguess, a, d, e] = KIL(
         imax, dts, xguess, dtguess, xmin, dtmin, xmax, dtmax,
@@ -453,7 +455,9 @@ def CSEroutine(r0, v0, dt, last):
     b4 = 1 / rs
 
     if n > 0:
+        # noinspection PyUnboundLocalVariable
         xc = f6 * (xguess + n * xp)
+        # noinspection PyUnboundLocalVariable
         dtc = f4 * (dtguess + n * ps)
     else:
         xc = f6 * xguess
@@ -479,10 +483,10 @@ def CSEroutine(r0, v0, dt, last):
 def KTTI(xarg, s0s, a, kmax):
     u1 = uss(xarg, a, kmax)
     zs = 2 * u1
-    e = 1 - 0.5 * a * zs**2
+    e = 1 - 0.5 * a * zs ** 2
     w = np.sqrt(max(0.5 + e / 2, 0))
     d = w * zs
-    a = d**2
+    a = d ** 2
     b = 2 * (e + s0s * d)
     q = qcf(w)
     t = d * (b + a * q)
@@ -493,7 +497,7 @@ def KTTI(xarg, s0s, a, kmax):
 def uss(xarg, a, kmax):
     du1 = xarg / 4
     u1 = du1
-    f7 = -a * du1**2
+    f7 = -a * du1 ** 2
     k = 3
     while k < kmax:
         du1 = f7 * du1 / (k * (k - 1))
@@ -513,7 +517,7 @@ def qcf(w):
     elif w < 13.846:
         xq = (10 / 7) * (w + 12)
     elif w < 44:
-        xq = 0.5(w + 60)
+        xq = 0.5 * (w + 60)
     elif w < 100:
         xq = 0.25 * (w + 164)
     else:
@@ -527,7 +531,7 @@ def qcf(w):
         j = j - 1
         b = y / (1 + (j - 1) / (j + 2) * (1 - b))
 
-    q = 1 / w**2 * (1 + (2 - b / 2) / (3 * w * (w + 1)))
+    q = 1 / w ** 2 * (1 + (2 - b / 2) / (3 * w * (w + 1)))
     return q
 
 
@@ -592,17 +596,18 @@ def rodrigues(vector, axis, angle):
     return rotated
 
 
-def throttle_control(vehicle, G_limit, Q_limit):
+def throttle_control(vehicle, g_limit, q_limit):
     min_thrust = vessel.available_thrust * vehicle[0].minThrottle
     max_thrust = vessel.available_thrust * vehicle[0].maxThrottle
     if max_thrust == 0 or vehicle[0].minThrottle == 1:
         return 1
-    G_thrust = G_limit * Global.state_mass() * g0
+    G_thrust = g_limit * Global.state_mass() * g0
     G_throttle = (G_thrust - min_thrust) / (max_thrust - min_thrust)
 
-    Q_ratio = Global.state_q() / Q_limit
+    Q_ratio = Global.state_q() / q_limit
     Q_throttle = 1 - 15 * (Q_ratio - 1)
-    the_throttle = np.clip(min(Q_throttle, G_throttle), 0.01, 1)
+    the_throttle = np.minimum(Q_throttle, G_throttle)
+    the_throttle = np.clip(the_throttle, 0.01, 1)
 
     return the_throttle
 
