@@ -1,8 +1,11 @@
-import Global
-import numpy as np
 import sys
 import time
+
+import numpy as np
+
+import Global
 import upfg
+
 # from multiprocessing.pool import ThreadPool
 
 conn = Global.conn
@@ -43,11 +46,11 @@ else:
     g_lim = 5
     q_lim = 33000
 print(meco_speed)
-[azimuth, launch_time, target] = upfg.launchTargeting(target_periapsis,
-                                                      target_apoapsis,
-                                                      target_inclination,
-                                                      target_lan,
-                                                      target_true_anomaly)
+[azimuth, launch_time, target] = upfg.launch_targeting(target_periapsis,
+                                                       target_apoapsis,
+                                                       target_inclination,
+                                                       target_lan,
+                                                       target_true_anomaly)
 
 game_launch_time = space_center.ut + launch_time
 space_center.warp_to(game_launch_time - 10)
@@ -125,9 +128,9 @@ iteration = 0
 
 while converged is False:
     [upfg_internal, upfg_guided] = upfg.upfg(vehicle, target, upfg_internal)
-    t1 = upfg_internal.tgo
+    t1 = upfg_guided.tgo
     [upfg_internal, upfg_guided] = upfg.upfg(vehicle, target, upfg_internal)
-    t2 = upfg_internal.tgo
+    t2 = upfg_guided.tgo
     if abs(t1 - t2) / t2 < 0.01:
         converged = True
     iteration += 1
@@ -149,8 +152,8 @@ while True:
         break
     if Global.surface_altitude() > 110000 and not fairing_jettison:
         for fairing in vessel.parts.fairings:
-            for module in fairing.part.modules:
-                if module.has_event('Jettison'):
-                    module.trigger_event('Jettison')
+            for mod in fairing.part.modules:
+                if mod.has_event('Jettison'):
+                    mod.trigger_event('Jettison')
                     fairing_jettison = True
 print('Mission Success')
