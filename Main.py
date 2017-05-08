@@ -62,7 +62,7 @@ while Global.state_thrust() < vessel.available_thrust:
     time.sleep(0.2)
 
 vessel.auto_pilot.engage()
-vessel.auto_pilot.target_heading = 90
+vessel.auto_pilot.target_heading = azimuth
 vessel.auto_pilot.target_roll = 0
 vessel.auto_pilot.target_pitch = 90
 vessel.control.activate_next_stage()
