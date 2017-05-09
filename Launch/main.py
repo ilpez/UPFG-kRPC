@@ -3,22 +3,22 @@ import time
 
 import numpy as np
 
-import Global
-import upfg
+from Launch import globals
+from Launch import upfg
 
 # from multiprocessing.pool import ThreadPool
 
-conn = Global.conn
-space_center = Global.space_center
-vessel = Global.vessel
+conn = globals.conn
+space_center = globals.space_center
+vessel = globals.vessel
 vehicle = upfg.analyze_vehicle()
 
-position = Global.orbital_position
-velocity = Global.orbital_velocity
-surface_speed = Global.surface_speed
+position = globals.orbital_position
+velocity = globals.orbital_velocity
+surface_speed = globals.surface_speed
 
-g0 = Global.g0
-mu = Global.mu
+g0 = globals.g0
+mu = globals.mu
 
 target_apoapsis = float(sys.argv[1])
 target_periapsis = float(sys.argv[2])
@@ -60,7 +60,7 @@ while (space_center.ut - game_launch_time) < 0:
     time.sleep(1)
 
 vessel.control.activate_next_stage()
-while Global.state_thrust() < vessel.available_thrust:
+while globals.state_thrust() < vessel.available_thrust:
     vessel.control.throttle = 1
     time.sleep(0.2)
 
@@ -86,8 +86,8 @@ while True:
 
     pitch1 = upfg.atand((900 - 2 * turn_speed) /
                         (surface_speed() - turn_speed))
-    pitch2 = upfg.angle_from_vec(Global.surface_velocity(),
-                                 Global.body_reference_frame,
+    pitch2 = upfg.angle_from_vec(globals.surface_velocity(),
+                                 globals.body_reference_frame,
                                  'pitch')
     vessel.auto_pilot.target_pitch = min(pitch1, pitch2)
     if surface_speed() > meco_speed or vessel.available_thrust == 0:
@@ -116,9 +116,9 @@ upfg_internal.cser = cser
 upfg_internal.rbias = [0, 0, 0]
 upfg_internal.rd = rdinit
 upfg_internal.rgrav = np.multiply(
-    np.multiply(-(mu / 2), position()), 1 / upfg.norm(position())**3)
+    np.multiply(-(mu / 2), position()), 1 / upfg.norm(position()) ** 3)
 upfg_internal.tb = 0
-upfg_internal.time = Global.universal_time()
+upfg_internal.time = globals.universal_time()
 upfg_internal.tgo = 0
 upfg_internal.v = velocity()
 upfg_internal.vgo = vdinit
@@ -147,10 +147,10 @@ while True:
     if t < 0.1:
         vessel.control.throttle = 0
         break
-    if Global.orbital_speed() > target.velocity:
+    if globals.orbital_speed() > target.velocity:
         vessel.control.throttle = 0
         break
-    if Global.surface_altitude() > 110000 and not fairing_jettison:
+    if globals.surface_altitude() > 110000 and not fairing_jettison:
         for fairing in vessel.parts.fairings:
             for mod in fairing.part.modules:
                 if mod.has_event('Jettison'):

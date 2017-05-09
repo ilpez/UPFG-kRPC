@@ -3,13 +3,13 @@ from collections import OrderedDict
 
 import numpy as np
 
-import Global
+from Launch import globals
 
-conn = Global.conn
-space_center = Global.space_center
-vessel = Global.vessel
-mu = Global.mu
-g0 = Global.g0
+conn = globals.conn
+space_center = globals.space_center
+vessel = globals.vessel
+mu = globals.mu
+g0 = globals.g0
 # For ease of use
 orbref = vessel.orbit.body.non_rotating_reference_frame
 
@@ -195,11 +195,11 @@ def upfg(vehicle, target, previous):
     iy = np.asarray(target.normal)
     rdval = target.radius
     vdval = target.velocity
-    t = Global.universal_time()
-    m = Global.state_mass()
-    r = Global.orbital_position()
+    t = globals.universal_time()
+    m = globals.state_mass()
+    r = globals.orbital_position()
     r = np.array([r[0], r[2], r[1]])
-    v = Global.orbital_velocity()
+    v = globals.orbital_velocity()
     v = np.array([v[0], v[2], v[1]])
     cser = previous.cser
     rbias = np.asarray(previous.rbias)
@@ -216,7 +216,7 @@ def upfg(vehicle, target, previous):
     a_t = list()
     tu = list()
     tb = list()
-    if n > 1 and Global.state_thrust() == 0:
+    if n > 1 and globals.state_thrust() == 0:
         stageController(vehicle)
         return upfg(vehicle, target, previous)
 
@@ -233,7 +233,7 @@ def upfg(vehicle, target, previous):
     vgo = vgo - dvsensed
     # vgo1 = vgo
     tb[0] = tb[0] - previous.tb
-    f_t[0] = Global.state_thrust()
+    f_t[0] = globals.state_thrust()
     a_t[0] = f_t[0] / m
     tu[0] = ve[0] / a_t[0]
     L = 0
@@ -601,10 +601,10 @@ def throttle_control(vehicle, g_limit, q_limit):
     max_thrust = vessel.available_thrust * vehicle[0].maxThrottle
     if max_thrust == 0 or vehicle[0].minThrottle == 1:
         return 1
-    G_thrust = g_limit * Global.state_mass() * g0
+    G_thrust = g_limit * globals.state_mass() * g0
     G_throttle = (G_thrust - min_thrust) / (max_thrust - min_thrust)
 
-    Q_ratio = Global.state_q() / q_limit
+    Q_ratio = globals.state_q() / q_limit
     Q_throttle = 1 - 15 * (Q_ratio - 1)
     the_throttle = np.minimum(Q_throttle, G_throttle)
     the_throttle = np.clip(the_throttle, 0.01, 1)
@@ -715,5 +715,5 @@ def stageController(vehicle, delay=2, ullage=True, booster=False):
             vessel.control.throttle = 1
     if booster:
         vessel.control.activate_next_stage()
-    while Global.state_thrust() < vessel.available_thrust:
+    while globals.state_thrust() < vessel.available_thrust:
         time.sleep(0.01)
