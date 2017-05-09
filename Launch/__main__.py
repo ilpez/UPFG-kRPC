@@ -95,10 +95,10 @@ while True:
 
 print('Main Engine Cutoff')
 
-upfg.stageController(vehicle)
+upfg.stage_controller(vehicle)
 
 fairing_jettison = False
-cser = upfg.struct()
+cser = upfg.Struct()
 cser.dtcp = 0
 cser.xcp = 0
 cser.a = 0
@@ -110,7 +110,7 @@ rdinit = np.multiply(rdinit, target.radius)
 vdinit = np.multiply(target.velocity, upfg.unit(
     upfg.cross(-target.normal, rdinit)))
 vdinit = vdinit - velocity()
-upfg_internal = upfg.struct()
+upfg_internal = upfg.Struct()
 upfg_internal.cser = cser
 upfg_internal.rbias = [0, 0, 0]
 upfg_internal.rd = rdinit
@@ -122,7 +122,7 @@ upfg_internal.tgo = 0
 upfg_internal.v = velocity()
 upfg_internal.vgo = vdinit
 converged = False
-upfg_guided = upfg.struct()
+upfg_guided = upfg.Struct()
 iteration = 0
 
 while converged is False:
@@ -139,11 +139,10 @@ print('Guidance converged after %f iteration' % iteration)
 while True:
     vessel.control.throttle = upfg.throttle_control(vehicle, g_lim, q_lim)
     [upfg_internal, upfg_guided] = upfg.upfg(vehicle, target, upfg_internal)
-    t = upfg_guided.tgo
-    if t > 1:
+    if upfg_guided.tgo > 1:
         vessel.auto_pilot.target_heading = upfg_guided.yaw
         vessel.auto_pilot.target_pitch = upfg_guided.pitch
-    if t < 0.1:
+    if upfg_guided.tgo < 0.1:
         vessel.control.throttle = 0
         break
     if globals.orbital_speed() > target.velocity:

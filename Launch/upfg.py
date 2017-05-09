@@ -83,7 +83,7 @@ def vang(x, y):
     return acosd(np.clip(dot(x, y), -1, 1))
 
 
-class struct:
+class Struct:
     pass
 
 
@@ -166,7 +166,7 @@ def launch_targeting(periapsis,
     m2 = np.transpose([0, 0, -1])
 
     target_plane_normal = np.matmul(m1, m2).transpose()
-    target = struct()
+    target = Struct()
     target.radius = radius
     target.normal = target_plane_normal
     target.angle = angle
@@ -217,7 +217,7 @@ def upfg(vehicle, target, previous):
     tu = list()
     tb = list()
     if n > 1 and globals.state_thrust() == 0:
-        stageController(vehicle)
+        stage_controller(vehicle)
         return upfg(vehicle, target, previous)
 
     for i in range(n):
@@ -236,22 +236,22 @@ def upfg(vehicle, target, previous):
     f_t[0] = globals.state_thrust()
     a_t[0] = f_t[0] / m
     tu[0] = ve[0] / a_t[0]
-    L = 0
-    Li = list()
+    l_ = 0
+    li_ = list()
 
     for i in range(n - 1):
-        Li.append(ve[i] * np.log(tu[i] / (tu[i] - tb[i])))
-        L += Li[i]
-        if L > norm(vgo):
+        li_.append(ve[i] * np.log(tu[i] / (tu[i] - tb[i])))
+        l_ += li_[i]
+        if l_ > norm(vgo):
             vehicle.remove(vehicle[-1])
             print('We have more than what we need')
             return upfg(vehicle, target, previous)
-    Li.append(norm(vgo) - L)
+    li_.append(norm(vgo) - l_)
 
     tgoi = list()
 
     for i in range(n):
-        tb[i] = tu[i] * (1 - np.exp(-Li[i] / ve[i]))
+        tb[i] = tu[i] * (1 - np.exp(-li_[i] / ve[i]))
         if i == 0:
             tgoi.append(tb[i])
         else:
@@ -264,38 +264,37 @@ def upfg(vehicle, target, previous):
     else:
         theta_max = d2r(1)
 
-    L = 0
-    S = 0
-    J = 0
-    Q = 0
-    P = 0
-    H = 0
-    Ji = list()
-    Si = list()
-    Qi = list()
-    Pi = list()
+    l_ = 0
+    s_ = 0
+    j_ = 0
+    q_ = 0
+    p_ = 0
+    h_ = 0
+    ji_ = list()
+    si_ = list()
+    qi_ = list()
+    pi_ = list()
     tgoi1 = 0
 
     for i in range(n):
         if i > 0:
             tgoi1 = tgoi[i - 1]
-        Ji.append(tu[i] * Li[i] - ve[i] * tb[i])
-        Si.append(tb[i] * Li[i] - Ji[i])
-        Qi.append(Si[i] * (tu[i] + tgoi1) - 0.5 * ve[i] * tb[i] ** 2)
-        Pi.append(Qi[i] * (tu[i] + tgoi1) - 0.5 * ve[i]
-                  * tb[i] ** 2 * (tb[i] / 3 + tgoi1))
+        ji_.append(tu[i] * li_[i] - ve[i] * tb[i])
+        si_.append(tb[i] * li_[i] - ji_[i])
+        qi_.append(si_[i] * (tu[i] + tgoi1) - 0.5 * ve[i] * tb[i] ** 2)
+        pi_.append(qi_[i] * (tu[i] + tgoi1) - 0.5 * ve[i] * tb[i] ** 2 * (tb[i] / 3 + tgoi1))
 
-        Ji[i] += Li[i] * tgoi1
-        Si[i] += L * tb[i]
-        Qi[i] += J * tb[i]
-        Pi[i] += H * tb[i]
+        ji_[i] += li_[i] * tgoi1
+        si_[i] += l_ * tb[i]
+        qi_[i] += j_ * tb[i]
+        pi_[i] += h_ * tb[i]
 
-        L += Li[i]
-        J += Ji[i]
-        S += Si[i]
-        Q += Qi[i]
-        P += Pi[i]
-        H = J * tgoi[i] - Q
+        l_ += li_[i]
+        j_ += ji_[i]
+        s_ += si_[i]
+        q_ += qi_[i]
+        p_ += pi_[i]
+        h_ = j_ * tgoi[i] - q_
 
     lamb = unit(vgo)
     # rgrav1 = rgrav
@@ -306,23 +305,23 @@ def upfg(vehicle, target, previous):
     iz = unit(cross(rd, iy))
     # iz1 = iz
     rgoxy = rgo - dot(iz, rgo) * iz
-    rgoz = (S - dot(lamb, rgoxy)) / dot(lamb, iz)
+    rgoz = (s_ - dot(lamb, rgoxy)) / dot(lamb, iz)
     rgo = rgoxy + rgoz * iz + rbias
-    lambdade = Q - S * J / L
-    lambdadot = (rgo - S * lamb) / lambdade
-    if (norm(lambdadot) * J / L) > theta_max:
-        lambdadotmag = theta_max / (J / L)
+    lambdade = q_ - s_ * j_ / l_
+    lambdadot = (rgo - s_ * lamb) / lambdade
+    if (norm(lambdadot) * j_ / l_) > theta_max:
+        lambdadotmag = theta_max / (j_ / l_)
         lambdadot = unit(lambdadot) * lambdadotmag
-        rgo = S * lamb + lambdade * lambdadot
-    i_f = unit(lamb - lambdadot * J / L)
+        rgo = s_ * lamb + lambdade * lambdadot
+    i_f = unit(lamb - lambdadot * j_ / l_)
     phi = np.arccos(dot(i_f, lamb))
-    phidot = -phi * L / J
-    vthrust = (L - 0.5 * L * phi ** 2 - J * phi *
-               phidot - 0.5 * H * phidot ** 2) * lamb
-    vthrust = vthrust - (L * phi + J * phidot) * unit(lambdadot)
-    rthrust = (S - 0.5 * S * phi ** 2 - Q * phi *
-               phidot - 0.5 * P * phidot ** 2) * lamb
-    rthrust = rthrust - (S * phi + Q * phidot) * unit(lambdadot)
+    phidot = -phi * l_ / j_
+    vthrust = (l_ - 0.5 * l_ * phi ** 2 - j_ * phi *
+               phidot - 0.5 * h_ * phidot ** 2) * lamb
+    vthrust = vthrust - (l_ * phi + j_ * phidot) * unit(lambdadot)
+    rthrust = (s_ - 0.5 * s_ * phi ** 2 - q_ * phi *
+               phidot - 0.5 * p_ * phidot ** 2) * lamb
+    rthrust = rthrust - (s_ * phi + q_ * phidot) * unit(lambdadot)
     vbias = vgo - vthrust
     rbias = rgo - rthrust
 
@@ -357,7 +356,7 @@ def upfg(vehicle, target, previous):
     previous.v = v
     previous.vgo = vgo
 
-    guidance = struct()
+    guidance = Struct()
     guidance.pitch = pitch
     guidance.yaw = yaw
     guidance.tgo = tgo
@@ -423,18 +422,18 @@ def cse_routine(r0, v0, dt, last):
             xguess = xguess - xp
             xlast = xlast - xp
     else:
-        [dtmax, _, _, _] = KTTI(xmax, sigma0s, alphas, kmax)
+        [dtmax, _, _, _] = k_t_t_i(xmax, sigma0s, alphas, kmax)
         if dtmax < dts:
             while dtmax >= dts:
                 dtmin = dtmax
                 xmin = xmax
                 xmax = np.multiply(2, xmax)
-                [dtmax, _, _, _] = KTTI(xmax, sigma0s, alphas, kmax)
+                [dtmax, _, _, _] = k_t_t_i(xmax, sigma0s, alphas, kmax)
 
     if xmin >= xguess or xguess >= xmax:
         xguess = 0.5 * (xmin + xmax)
 
-    [dtguess, _, _, _] = KTTI(xguess, sigma0s, alphas, kmax)
+    [dtguess, _, _, _] = k_t_t_i(xguess, sigma0s, alphas, kmax)
 
     if dts < dtguess:
         if xguess < xlast < xmax:
@@ -447,7 +446,7 @@ def cse_routine(r0, v0, dt, last):
                 xmin = xlast
                 dtmin = dtlast
 
-    [xguess, dtguess, a, d, e] = KIL(
+    [xguess, dtguess, a, d, e] = k_i_l(
         imax, dts, xguess, dtguess, xmin, dtmin, xmax, dtmax,
         sigma0s, alphas, kmax, a, d, e)
 
@@ -480,7 +479,7 @@ def cse_routine(r0, v0, dt, last):
     return [r, v, last]
 
 
-def KTTI(xarg, s0s, a, kmax):
+def k_t_t_i(xarg, s0s, a, kmax):
     u1 = uss(xarg, a, kmax)
     zs = 2 * u1
     e = 1 - 0.5 * a * zs ** 2
@@ -495,7 +494,7 @@ def KTTI(xarg, s0s, a, kmax):
 
 
 def uss(xarg, a, kmax):
-    du1 = xarg / 4
+    du1 = np.divide(xarg, 4)
     u1 = du1
     f7 = -a * du1 ** 2
     k = 3
@@ -535,8 +534,8 @@ def qcf(w):
     return q
 
 
-def KIL(imax, dts, xguess, dtguess, xmin, dtmin, xmax, dtmax,
-        s0s, alphas, kmax, a, d, e):
+def k_i_l(imax, dts, xguess, dtguess, xmin, dtmin, xmax, dtmax,
+          s0s, alphas, kmax, a, d, e):
     i = 1
     while i < imax:
         dterror = dts - dtguess
@@ -553,7 +552,7 @@ def KIL(imax, dts, xguess, dtguess, xmin, dtmin, xmax, dtmax,
             break
 
         dtold = dtguess
-        [dtguess, a, d, e] = KTTI(xguess, s0s, alphas, kmax)
+        [dtguess, a, d, e] = k_t_t_i(xguess, s0s, alphas, kmax)
 
         if dtguess == dtold:
             break
@@ -601,12 +600,12 @@ def throttle_control(vehicle, g_limit, q_limit):
     max_thrust = vessel.available_thrust * vehicle[0].maxThrottle
     if max_thrust == 0 or vehicle[0].minThrottle == 1:
         return 1
-    G_thrust = g_limit * globals.state_mass() * g0
-    G_throttle = (G_thrust - min_thrust) / (max_thrust - min_thrust)
+    g_thrust = g_limit * globals.state_mass() * g0
+    g_throttle = (g_thrust - min_thrust) / (max_thrust - min_thrust)
 
-    Q_ratio = globals.state_q() / q_limit
-    Q_throttle = 1 - 15 * (Q_ratio - 1)
-    the_throttle = np.minimum(Q_throttle, G_throttle)
+    q_ratio = globals.state_q() / q_limit
+    q_throttle = 1 - 15 * (q_ratio - 1)
+    the_throttle = np.minimum(q_throttle, g_throttle)
     the_throttle = np.clip(the_throttle, 0.01, 1)
 
     return the_throttle
@@ -622,22 +621,22 @@ def analyze_vehicle():
     print(stage)
     m0 = list()
     m1 = list()
-    fT = list()
+    f_t = list()
     ve = list()
-    aT = list()
+    a_t = list()
     tu = list()
     l1 = list()
     tb = list()
-    maxThrottle = list()
-    minThrottle = list()
+    max_throttle = list()
+    min_throttle = list()
     mass = 0
 
     for i in range(len(stage)):
         part_list = vessel.parts.in_decouple_stage(stage[i])
         fuel_name = list()
         thrust = 0
-        maxThrust = 0
-        minThrust = 0
+        max_thrust = 0
+        min_thrust = 0
         flow_rate = 0
         isp = 0
         for part in part_list:
@@ -650,9 +649,9 @@ def analyze_vehicle():
                     fuel_name.append(fuel.name)
                 prev_limit = part.engine.thrust_limit
                 part.engine.thrust_limit = 0
-                minThrust += part.engine.available_thrust
+                min_thrust += part.engine.available_thrust
                 part.engine.thrust_limit = prev_limit
-                maxThrust += part.engine.available_thrust
+                max_thrust += part.engine.available_thrust
 
         resources_list = vessel.resources_in_decouple_stage(
             stage[i] + 1, False)
@@ -665,41 +664,41 @@ def analyze_vehicle():
 
         m0.append(mass)
         m1.append(fuel_mass)
-        fT.append(thrust)
+        f_t.append(thrust)
         ve.append(thrust / flow_rate)
-        aT.append(thrust / mass)
+        a_t.append(thrust / mass)
         tb.append(fuel_mass / flow_rate)
         tu.append(ve[i] * mass / thrust)
         l1.append(ve[i] * np.log(tu[i] / (tu[i] - tb[i])))
-        minThrottle.append(minThrust / maxThrust)
-        maxThrottle.append(maxThrust / maxThrust)
+        min_throttle.append(min_thrust / max_thrust)
+        max_throttle.append(max_thrust / max_thrust)
 
     m0.reverse()
     m1.reverse()
-    fT.reverse()
+    f_t.reverse()
     ve.reverse()
-    aT.reverse()
+    a_t.reverse()
     tu.reverse()
     l1.reverse()
     tb.reverse()
-    minThrottle.reverse()
-    maxThrottle.reverse()
+    min_throttle.reverse()
+    max_throttle.reverse()
     vehicle = list()
     for i in range(len(stage)):
-        stages = struct()
+        stages = Struct()
         stages.m0 = m0[i]
-        stages.fT = fT[i]
+        stages.fT = f_t[i]
         stages.ve = ve[i]
         stages.l1 = l1[i]
-        stages.maxThrottle = maxThrottle[i]
-        stages.minThrottle = minThrottle[i]
+        stages.maxThrottle = max_throttle[i]
+        stages.minThrottle = min_throttle[i]
         stages.maxT = tb[i]
         vehicle.append(stages)
 
     return vehicle
 
 
-def stageController(vehicle, delay=2, ullage=True, booster=False):
+def stage_controller(vehicle, delay=2, ullage=True, booster=False):
     if not booster:
         vessel.control.throttle = 0
         time.sleep(delay)
