@@ -6,8 +6,6 @@ import numpy as np
 from Launch import globals
 from Launch import upfg
 
-# from multiprocessing.pool import ThreadPool
-
 conn = globals.conn
 space_center = globals.space_center
 vessel = globals.vessel
@@ -25,6 +23,7 @@ target_periapsis = float(sys.argv[2])
 target_inclination = float(sys.argv[3])
 target_lan = float(sys.argv[4])
 target_true_anomaly = float(sys.argv[5])
+sys.argv[6].upper()
 if sys.argv[6] == 'RTLS':
     meco_speed = 1700
     turn_speed = 30
