@@ -38,12 +38,12 @@ elif sys.argv[6] == 'EXP':
     meco_speed = 2700
     turn_speed = 30
     g_lim = 5
-    q_lim = 35000
+    q_lim = 34000
 else:
     meco_speed = vehicle[0].l1 - 1000
     turn_speed = 30
     g_lim = 5
-    q_lim = 35000
+    q_lim = 34000
 print(meco_speed)
 [azimuth, launch_time, target] = upfg.launch_targeting(target_periapsis,
                                                        target_apoapsis,
