@@ -34,11 +34,6 @@ elif sys.argv[6] == 'ASDS':
     turn_speed = 30
     g_lim = 5
     q_lim = 31000
-elif sys.argv[6] == 'EXP':
-    meco_speed = 2700
-    turn_speed = 30
-    g_lim = 5
-    q_lim = 34000
 else:
     meco_speed = vehicle[0].l1 - 1000
     turn_speed = 30
@@ -59,13 +54,13 @@ while (space_center.ut - game_launch_time) < 0:
     time.sleep(1)
 
 vessel.control.activate_next_stage()
+vessel.control.throttle = 1
 while globals.state_thrust() < vessel.available_thrust:
-    vessel.control.throttle = 1
     time.sleep(0.2)
 
 vessel.auto_pilot.engage()
 vessel.auto_pilot.target_heading = azimuth
-vessel.auto_pilot.target_roll = 0
+vessel.auto_pilot.target_roll = azimuth
 vessel.auto_pilot.target_pitch = 90
 vessel.control.activate_next_stage()
 vessel.auto_pilot.wait()
@@ -83,7 +78,7 @@ vessel.auto_pilot.target_heading = azimuth
 while True:
     vessel.control.throttle = upfg.throttle_control(vehicle, g_lim, q_lim)
 
-    pitch1 = upfg.atand((900 - 2 * turn_speed) /
+    pitch1 = upfg.atand((850 - 2 * turn_speed) /
                         (surface_speed() - turn_speed))
     pitch2 = upfg.angle_from_vec(globals.surface_velocity(),
                                  globals.body_reference_frame,
